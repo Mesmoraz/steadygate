@@ -33,7 +33,16 @@ _BUSY = Path(__file__).parent / "helpers" / "busy.py"
 
 
 def _spawn() -> subprocess.Popen[bytes]:
-    return subprocess.Popen([_PYTHON, str(_BUSY), "30"])
+    import psutil
+
+    p = subprocess.Popen([_PYTHON, str(_BUSY), "30"])
+    # Wait until the child is burning CPU. On macOS the framework python3.x binary re-execs
+    # itself as "Python" under the same pid, so its name isn't stable until it is running.
+    proc = psutil.Process(p.pid)
+    deadline = time.monotonic() + 10
+    while proc.cpu_times().user < 0.05 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    return p
 
 
 @pytest.fixture

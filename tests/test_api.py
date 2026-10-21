@@ -5,6 +5,7 @@ import subprocess
 import time
 from pathlib import Path
 
+import psutil
 from fastapi.testclient import TestClient
 
 from steadygate.api import create_app
@@ -27,7 +28,9 @@ def test_collectors_lists_metrics(client: TestClient) -> None:
 
 
 def test_processes_search(client: TestClient) -> None:
-    pids = [p["pid"] for p in client.get("/processes", params={"q": "python"}).json()["processes"]]
+    # Search for our own name: it is "pytest" on Linux, "python.exe" on Windows.
+    me = psutil.Process().name()
+    pids = [p["pid"] for p in client.get("/processes", params={"q": me}).json()["processes"]]
     assert os.getpid() in pids
 
 
