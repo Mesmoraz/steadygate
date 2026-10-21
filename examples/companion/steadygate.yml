@@ -1,0 +1,16 @@
+# Gate a process sampled by the companion: `steadygate serve -c examples/companion/steadygate.yml`
+store: .steadygate/history.db
+window: 10
+min_history: 3
+rules:
+  # Memory must not grow more than 10% over the median of recent baseline runs.
+  - type: relative_delta
+    metric: rss_mb
+    direction: lower_is_better
+    max_regression: 0.10
+  # CPU is noisy; report it but don't let it decide the verdict.
+  - type: relative_delta
+    metric: cpu_pct
+    direction: lower_is_better
+    max_regression: 0.25
+    required: false
