@@ -132,3 +132,13 @@ def test_cors_only_allowed_origin(companion_config: Path) -> None:
         assert ok.headers["access-control-allow-origin"] == "http://localhost:3000"
         own = c.post("/sessions", json={}, headers={"Origin": "http://testserver"})
         assert own.status_code == 200
+
+
+def test_dashboard_served(client: TestClient) -> None:
+    page = client.get("/")
+    assert page.status_code == 200
+    assert "<title>Steadygate</title>" in page.text
+    assert '<script src="app.js"' in page.text
+    assert client.get("/app.js").status_code == 200
+    assert client.get("/style.css").status_code == 200
+    assert client.get("/collectors").json()["api"] == 1  # API routes still win

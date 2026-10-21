@@ -18,6 +18,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException
 
@@ -31,6 +32,7 @@ from steadygate.stats import summarize
 from steadygate.store import Store
 
 API_VERSION = 1
+WEB_DIR = Path(__file__).parent / "web"
 
 
 class CollectorSpec(BaseModel):
@@ -232,6 +234,8 @@ def create_app(
         app.state.config = new_cfg
         return _ok(yaml=body.yaml, rules=len(new_cfg.rules))
 
+    # Mounted last so every API route above takes precedence over a static file.
+    app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="dashboard")
     return app
 
 

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Steadygate</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Steadygate <span class="muted">companion</span></h1>
+    <a href="docs" class="muted">API docs</a>
+  </header>
+
+  <main>
+    <section id="collectors-panel" class="card">
+      <h2>What this machine can gather</h2>
+      <ul id="collectors" class="chips"></ul>
+    </section>
+
+    <section id="new-session" class="card">
+      <h2>New session</h2>
+      <label for="proc-search">Process to sample <span class="muted">(leave empty to push metrics only)</span></label>
+      <input id="proc-search" type="search" placeholder="Search by name, e.g. myapp" autocomplete="off">
+      <ul id="proc-results" class="picker"></ul>
+      <div class="row">
+        <label for="session-name">Name <input id="session-name" type="text" placeholder="optional"></label>
+        <label for="interval">Interval (s) <input id="interval" type="number" value="1" min="0.1" step="0.1"></label>
+      </div>
+      <button id="start" class="primary">Start session</button>
+      <p id="start-error" class="error" hidden></p>
+    </section>
+
+    <section id="live" class="card" hidden>
+      <div class="row spread">
+        <h2>Session <code id="session-id"></code> <span id="session-state" class="pill"></span></h2>
+        <button id="stop">Stop</button>
+      </div>
+      <p id="target" class="muted"></p>
+      <div id="charts" class="charts"></div>
+    </section>
+
+    <section id="stats-panel" class="card" hidden>
+      <h2>Stats</h2>
+      <div class="table-wrap"><table id="stats"></table></div>
+    </section>
+
+    <section id="baseline-panel" class="card" hidden>
+      <h2>Baseline</h2>
+      <div class="row">
+        <button id="record">Record as baseline</button>
+        <span id="runs" class="muted"></span>
+      </div>
+      <div class="row">
+        <select id="suggest-metric" aria-label="Metric to suggest a rule for"></select>
+        <button id="suggest">Suggest baseline</button>
+      </div>
+      <p id="suggest-why" class="muted"></p>
+      <pre id="suggest-yaml" hidden></pre>
+      <button id="apply" hidden>Apply to steadygate.yml</button>
+      <p id="baseline-msg" class="muted"></p>
+    </section>
+
+    <section id="gate-panel" class="card" hidden>
+      <div class="row spread">
+        <h2>Pass / fail</h2>
+        <button id="gate" class="primary">Run gate</button>
+      </div>
+      <div id="verdict" class="verdict" hidden></div>
+      <ul id="outcomes" class="outcomes"></ul>
+    </section>
+
+    <section id="snippets-panel" class="card" hidden>
+      <h2>Push metrics from your app</h2>
+      <div class="tabs" role="tablist">
+        <button role="tab" data-lang="curl" aria-selected="true">curl</button>
+        <button role="tab" data-lang="python">Python</button>
+        <button role="tab" data-lang="js">JavaScript</button>
+      </div>
+      <pre id="snippet"></pre>
+      <button id="copy">Copy</button>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
