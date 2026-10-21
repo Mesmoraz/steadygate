@@ -88,8 +88,10 @@ def test_sampler_collects_each_tick(manager: SessionManager, clock: FakeClock) -
     s = manager.create("demo", [{"id": "fake"}], interval_s=1)
     _until(lambda: clock.ticks >= 3)
     s = manager.stop(s.id)
-    assert s.ok_values("m") == [0.0, 1.0, 2.0]
-    assert [r.case for r in s.results] == ["t=0", "t=1", "t=2"]
+    # The first sample comes one interval after start: psutil's CPU % over a near-zero
+    # window right after priming is noise (a 350% spike in manual testing).
+    assert s.ok_values("m") == [1.0, 2.0]
+    assert [r.case for r in s.results] == ["t=1", "t=2"]
     assert s.state is SessionState.STOPPED
 
 

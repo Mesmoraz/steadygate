@@ -136,13 +136,13 @@ class Sampler(threading.Thread):
 
     def run(self) -> None:
         t0 = last_flush = self.clock()
-        while True:
+        # Wait before the first sample, not after: a CPU % taken right after the collector
+        # primed its counter covers a near-zero window and is noise.
+        while not self.wait(self._stop_event, self.interval_s):
             self._tick(self.clock() - t0)
             if self.clock() - last_flush >= self.flush_every_s:
                 self.on_flush(self.session)
                 last_flush = self.clock()
-            if self.wait(self._stop_event, self.interval_s):
-                return
 
     def stop(self) -> None:
         self._stop_event.set()
