@@ -6,12 +6,14 @@ so the CLI and the companion always reach the same verdict on the same data.
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+import yaml
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,9 +21,12 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException
 
+from steadygate import baseline, gate, report
 from steadygate import config as config_mod
 from steadygate.collectors import CollectorError, describe_all, find_processes
-from steadygate.sessions import Session, SessionError, SessionManager
+from steadygate.config import Config
+from steadygate.models import Verdict
+from steadygate.sessions import Session, SessionError, SessionManager, SessionState
 from steadygate.stats import summarize
 from steadygate.store import Store
 
@@ -43,6 +48,10 @@ class MetricIn(BaseModel):
     metric: str = Field(min_length=1)
     value: float = Field(allow_inf_nan=False)
     case: str | None = None
+
+
+class ConfigIn(BaseModel):
+    yaml: str
 
 
 def _ok(**fields: Any) -> dict[str, Any]:
@@ -163,4 +172,74 @@ def create_app(
             raise SessionError(f"no usable values for metric {metric!r}", 404)
         return _ok(metric=metric, **summarize(values).as_dict())
 
+    @app.post("/sessions/{session_id}/record")
+    def record_session(session_id: str) -> dict[str, Any]:
+        session = mgr.get(session_id)
+        if session.state is SessionState.RUNNING:
+            raise SessionError(f"session {session_id} is still running; stop it first", 409)
+        n = mgr.store.record(session.id, session.snapshot())
+        return _ok(recorded=n, runs=mgr.store.run_count())
+
+    @app.post("/sessions/{session_id}/gate")
+    def gate_session(session_id: str, record: bool = False) -> dict[str, Any]:
+        session = mgr.get(session_id)
+        if session.state is SessionState.RUNNING:
+            session = mgr.stop(session_id)
+        results = session.snapshot()
+        cfg: Config = app.state.config
+        outcome = gate.evaluate(cfg, results, mgr.store, run_id=session.id)
+        recorded = False
+        if record and outcome.verdict is Verdict.PASS:
+            mgr.store.record(session.id, results)
+            recorded = True
+        return _ok(
+            **report.as_dict(outcome),
+            code=int(outcome.verdict),
+            interrupted=session.state is SessionState.INTERRUPTED,
+            recorded=recorded,
+        )
+
+    @app.get("/baseline/suggest")
+    def suggest_baseline(metric: str, direction: str | None = None) -> dict[str, Any]:
+        cfg: Config = app.state.config
+        history = mgr.store.run_aggregates(metric, cfg.window)
+        try:
+            suggestion = baseline.suggest(
+                metric, history, direction or _direction_hint(metric), cfg.min_history
+            )
+        except ValueError as exc:
+            return _error(422, str(exc))  # type: ignore[return-value]
+        return _ok(**suggestion.as_dict())
+
+    @app.get("/config")
+    def get_config() -> dict[str, Any]:
+        return _ok(yaml=config_path.read_text(encoding="utf-8"))
+
+    @app.put("/config")
+    def put_config(body: ConfigIn) -> Any:
+        try:
+            raw = yaml.safe_load(body.yaml)
+        except yaml.YAMLError as exc:
+            return _error(422, f"not valid YAML: {exc}")
+        try:
+            new_cfg = config_mod.parse(raw, config_path.parent)
+        except config_mod.ConfigError as exc:
+            return _error(422, str(exc))
+        # Write beside the file, then swap, so a crash never leaves a half-written config.
+        tmp = config_path.with_suffix(".yml.tmp")
+        tmp.write_text(body.yaml, encoding="utf-8", newline="")
+        os.replace(tmp, config_path)
+        app.state.config = new_cfg
+        return _ok(yaml=body.yaml, rules=len(new_cfg.rules))
+
     return app
+
+
+def _direction_hint(metric: str) -> str:
+    for info in describe_all():
+        if info.metrics == "any":
+            continue
+        for m in info.metrics:
+            if m.name == metric and m.better == "lower":
+                return "lower_is_better"
+    return "higher_is_better"
