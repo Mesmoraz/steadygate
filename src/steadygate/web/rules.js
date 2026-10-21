@@ -4,10 +4,28 @@
 
 const ITEM = /^(\s*)-\s+type:\s*(\S+)/;
 
+// Metric names come from whatever an app pushed; quote anything that isn't a plain word so
+// "p95 #warm" stays one name instead of "p95" plus a YAML comment.
+function scalar(value) {
+  return /^[A-Za-z0-9_.\-]+$/.test(value) ? value : JSON.stringify(value);
+}
+
+function unquote(raw) {
+  if (raw.startsWith('"')) {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return raw;
+    }
+  }
+  if (raw.startsWith("'")) return raw.slice(1, raw.lastIndexOf("'")).replace(/''/g, "'");
+  return raw.replace(/\s+#.*$/, "");
+}
+
 function ruleYaml(rule, indent = "  ") {
   return [
     `${indent}- type: ${rule.type}`,
-    `${indent}  metric: ${rule.metric}`,
+    `${indent}  metric: ${scalar(rule.metric)}`,
     `${indent}  direction: ${rule.direction}`,
     `${indent}  max_regression: ${rule.max_regression}`,
   ].join("\n");
@@ -42,8 +60,8 @@ function mergeRule(yamlText, rule) {
     const block = lines.slice(s, e);
     const isDelta = ITEM.exec(lines[s])[2] === rule.type;
     const metricAt = block.findIndex((l) => {
-      const m = l.match(/^\s*(?:-\s+)?metric:\s*(\S+)\s*$/);
-      return m !== null && m[1] === rule.metric;
+      const m = l.match(/^\s*(?:-\s+)?metric:\s*(.+?)\s*$/);
+      return m !== null && unquote(m[1]) === rule.metric;
     });
     if (!isDelta || metricAt < 0) continue;
 

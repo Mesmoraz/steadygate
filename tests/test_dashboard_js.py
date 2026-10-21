@@ -80,3 +80,15 @@ def test_does_not_match_metric_prefix() -> None:
 def test_adds_rules_key_when_missing() -> None:
     rules = yaml.safe_load(merge("store: history.db\n", RULE))["rules"]
     assert rules == [RULE]
+
+
+def test_odd_metric_names_are_quoted() -> None:
+    rules = yaml.safe_load(merge(CONFIG, {**RULE, "metric": "p95 #warm"}))["rules"]
+    assert rules[2]["metric"] == "p95 #warm"
+
+
+def test_matches_quoted_metric_in_file() -> None:
+    quoted = CONFIG.replace("metric: rss_mb", 'metric: "rss_mb"')
+    rules = yaml.safe_load(merge(quoted, RULE))["rules"]
+    assert len(rules) == 2
+    assert rules[0]["max_regression"] == 0.05
