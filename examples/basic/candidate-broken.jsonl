@@ -1,0 +1,10 @@
+{"case": "refund-policy", "metric": "accuracy", "value": 1.0}
+{"case": "refund-policy", "metric": "latency_ms", "value": 850}
+{"case": "shipping-faq", "metric": "accuracy", "value": 0.9}
+{"case": "shipping-faq", "metric": "latency_ms", "value": 850}
+{"case": "escalation", "metric": "accuracy", "status": "error", "message": "LLM judge timed out after 30s"}
+{"case": "escalation", "metric": "latency_ms", "value": 850}
+{"case": "order-status", "metric": "accuracy", "value": 1.0}
+{"case": "order-status", "metric": "latency_ms", "value": 850}
+{"case": "returns-window", "metric": "accuracy", "value": 0.9}
+{"case": "returns-window", "metric": "latency_ms", "value": 850}

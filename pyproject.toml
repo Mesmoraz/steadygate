@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "steadygate"
+version = "0.0.1"
+description = "A statistical release gate for non-deterministic systems: LLM agents, evals, and flaky test suites."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Taylor Philpott" }]
+requires-python = ">=3.11"
+dependencies = ["PyYAML>=6.0"]
+keywords = ["ci", "evals", "llm", "testing", "quality-gate", "regression", "flaky-tests"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Software Development :: Testing",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6", "mypy>=1.11", "types-PyYAML"]
+
+[project.scripts]
+steadygate = "steadygate.cli:main"
+
+[project.urls]
+Repository = "https://github.com/Mesmoraz/steadygate"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/steadygate"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=steadygate --cov-report=term-missing --cov-fail-under=90"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["src"]

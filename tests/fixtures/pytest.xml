@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+  <testsuite name="pytest" errors="1" failures="1" skipped="1" tests="5" time="1.20">
+    <testcase classname="tests.test_agent" name="test_refund_policy" time="0.31"/>
+    <testcase classname="tests.test_agent" name="test_shipping_faq" time="0.42"/>
+    <testcase classname="tests.test_agent" name="test_escalation" time="0.20">
+      <failure message="assert 'manager' in reply">AssertionError</failure>
+    </testcase>
+    <testcase classname="tests.test_agent" name="test_judge_tone" time="0.01">
+      <error message="judge API timed out after 30s">TimeoutError</error>
+    </testcase>
+    <testcase classname="tests.test_agent" name="test_spanish" time="0.00">
+      <skipped message="not enabled"/>
+    </testcase>
+  </testsuite>
+</testsuites>

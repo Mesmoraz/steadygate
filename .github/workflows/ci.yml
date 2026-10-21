@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.11", "3.12", "3.13"]
+        include:
+          - os: windows-latest
+            python: "3.13"
+          - os: macos-latest
+            python: "3.13"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy
+      - run: pytest
+
+  # Steadygate gates its own example, so a behavior change shows up as a red build.
+  dogfood:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install .
+      - name: Example verdicts match their exit codes
+        working-directory: examples/basic
+        shell: bash
+        run: |
+          for i in 1 2 3; do steadygate record baseline-$i.jsonl --run-id base-$i; done
+          expect() { set +e; steadygate run "$2" --markdown "$2.md"; code=$?; set -e
+                     cat "$2.md" >> "$GITHUB_STEP_SUMMARY"
+                     [ "$code" -eq "$1" ] || { echo "::error::$2 exited $code, expected $1"; exit 1; }; }
+          expect 0 candidate-noise.jsonl
+          expect 1 candidate-regression.jsonl
+          expect 2 candidate-broken.jsonl

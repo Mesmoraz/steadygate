@@ -1,0 +1,25 @@
+# Steadygate config for a small support-agent eval suite.
+# Each case's "accuracy" is the fraction of 10 repeated trials the LLM judge accepted.
+
+store: .steadygate/history.db   # baseline history (relative to this file)
+window: 10                      # compare against the last 10 recorded runs
+min_history: 3                  # start gating once 3 runs are recorded
+
+rules:
+  # Mean accuracy may not drop more than 5% below the baseline median.
+  - type: relative_delta
+    metric: accuracy
+    max_regression: 0.05
+
+  # A hard floor: no single case may fall below 50%.
+  - type: absolute
+    metric: accuracy
+    min: 0.5
+    scope: case
+
+  # Latency is tracked but doesn't block the release.
+  - type: relative_delta
+    metric: latency_ms
+    direction: lower_is_better
+    max_regression: 0.25
+    required: false

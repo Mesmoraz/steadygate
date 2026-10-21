@@ -1,0 +1,7 @@
+{"case": "refund-policy", "metric": "accuracy", "value": 0.9}
+{"case": "refund-policy", "metric": "latency_ms", "value": 800}
+
+{"case": "shipping-faq", "metric": "accuracy", "value": 0.8}
+{"case": "shipping-faq", "metric": "latency_ms", "value": 1000}
+{"case": "tone-check", "metric": "accuracy", "status": "error", "message": "judge timeout"}
+{"case": "spanish", "metric": "accuracy", "status": "skipped"}

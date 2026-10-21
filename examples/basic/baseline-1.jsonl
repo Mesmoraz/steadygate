@@ -1,0 +1,10 @@
+{"case": "refund-policy", "metric": "accuracy", "value": 0.9}
+{"case": "refund-policy", "metric": "latency_ms", "value": 820}
+{"case": "shipping-faq", "metric": "accuracy", "value": 0.8}
+{"case": "shipping-faq", "metric": "latency_ms", "value": 820}
+{"case": "escalation", "metric": "accuracy", "value": 0.9}
+{"case": "escalation", "metric": "latency_ms", "value": 820}
+{"case": "order-status", "metric": "accuracy", "value": 1.0}
+{"case": "order-status", "metric": "latency_ms", "value": 820}
+{"case": "returns-window", "metric": "accuracy", "value": 0.9}
+{"case": "returns-window", "metric": "latency_ms", "value": 820}
