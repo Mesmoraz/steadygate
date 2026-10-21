@@ -189,15 +189,6 @@ $("record").addEventListener("click", async () => {
   }
 });
 
-function ruleYaml(rule) {
-  return [
-    `  - type: ${rule.type}`,
-    `    metric: ${rule.metric}`,
-    `    direction: ${rule.direction}`,
-    `    max_regression: ${rule.max_regression}`,
-  ].join("\n");
-}
-
 $("suggest").addEventListener("click", async () => {
   const metric = $("suggest-metric").value;
   if (!metric) return;
@@ -209,31 +200,6 @@ $("suggest").addEventListener("click", async () => {
   $("suggest-yaml").textContent = s.suggested ? ruleYaml(s.suggested) : "";
   $("suggest-yaml").hidden = $("apply").hidden = !s.suggested;
 });
-
-// Replace this metric's relative_delta rule if there is one, otherwise add it.
-function mergeRule(yamlText, rule) {
-  const lines = yamlText.replace(/\s+$/, "").split("\n");
-  const starts = [];
-  lines.forEach((l, i) => { if (/^\s*-\s+type:/.test(l)) starts.push(i); });
-  const blockEnd = (i) => {
-    let j = i + 1;
-    while (j < lines.length && !/^\s*-\s+type:/.test(lines[j]) && !/^\S/.test(lines[j])) j++;
-    return j;
-  };
-  const replacement = ruleYaml(rule).split("\n");
-  for (const s of starts) {
-    const e = blockEnd(s);
-    const block = lines.slice(s, e).join("\n");
-    if (/type:\s*relative_delta/.test(block) && new RegExp(`metric:\\s*${rule.metric}\\s*$`, "m").test(block)) {
-      lines.splice(s, e - s, ...replacement);
-      return lines.join("\n") + "\n";
-    }
-  }
-  const at = starts.length ? blockEnd(starts[starts.length - 1]) : lines.length;
-  if (!starts.length && !lines.some((l) => /^rules:/.test(l))) replacement.unshift("rules:");
-  lines.splice(at, 0, ...replacement);
-  return lines.join("\n") + "\n";
-}
 
 $("apply").addEventListener("click", async () => {
   try {
@@ -249,9 +215,14 @@ $("apply").addEventListener("click", async () => {
 
 $("gate").addEventListener("click", async () => {
   const g = await api("POST", `sessions/${state.session}/gate`);
+  // The engine passes a run whose required rules have no baseline yet; say so instead of
+  // showing a green PASS that judged nothing.
+  const required = g.rules.filter((o) => o.required);
+  const shown = g.verdict === "pass" && required.length && required.every((o) => o.outcome === "no_baseline")
+    ? "no_baseline" : g.verdict;
   const v = $("verdict");
-  v.className = `verdict ${g.verdict}`;
-  v.textContent = g.verdict.replace("_", " ").toUpperCase() + (g.interrupted ? " (interrupted session)" : "");
+  v.className = `verdict ${shown}`;
+  v.textContent = shown.replace("_", " ").toUpperCase() + (g.interrupted ? " (interrupted session)" : "");
   v.hidden = false;
   $("outcomes").replaceChildren(
     ...g.rules.map((o) =>
