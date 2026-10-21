@@ -5,6 +5,7 @@ import sys
 import time
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -52,3 +53,30 @@ def two_busy_procs() -> Iterator[tuple[subprocess.Popen[bytes], subprocess.Popen
     for p in (older, newer):
         p.kill()
         p.wait()
+
+
+COMPANION_YML = """\
+store: history.db
+min_history: 3
+rules:
+  - type: relative_delta
+    metric: m
+    max_regression: 0.05
+"""
+
+
+@pytest.fixture
+def companion_config(tmp_path: Path) -> Path:
+    path = tmp_path / "steadygate.yml"
+    path.write_text(COMPANION_YML, encoding="utf-8")
+    return path
+
+
+@pytest.fixture
+def client(companion_config: Path) -> Iterator[Any]:
+    from fastapi.testclient import TestClient
+
+    from steadygate.api import create_app
+
+    with TestClient(create_app(companion_config)) as c:
+        yield c
