@@ -123,14 +123,14 @@ def test_stop_twice_ok(client: TestClient) -> None:
 
 def test_cors_only_allowed_origin(companion_config: Path) -> None:
     app = create_app(companion_config, allow_origins=["http://localhost:3000"])
-    with TestClient(app) as c:
+    with TestClient(app, base_url="http://127.0.0.1") as c:
         evil = c.post("/sessions", json={}, headers={"Origin": "http://evil"})
         assert evil.status_code == 403
         assert "access-control-allow-origin" not in evil.headers
         ok = c.post("/sessions", json={}, headers={"Origin": "http://localhost:3000"})
         assert ok.status_code == 200
         assert ok.headers["access-control-allow-origin"] == "http://localhost:3000"
-        own = c.post("/sessions", json={}, headers={"Origin": "http://testserver"})
+        own = c.post("/sessions", json={}, headers={"Origin": "http://127.0.0.1"})
         assert own.status_code == 200
 
 
@@ -142,3 +142,21 @@ def test_dashboard_served(client: TestClient) -> None:
     assert client.get("/app.js").status_code == 200
     assert client.get("/style.css").status_code == 200
     assert client.get("/collectors").json()["api"] == 1  # API routes still win
+
+
+def test_dns_rebinding_host_rejected(client: TestClient, companion_config: Path) -> None:
+    # evil.example rebinds to 127.0.0.1; its page's Origin and Host then match each other.
+    before = companion_config.read_bytes()
+    headers = {"Host": "evil.example:7777", "Origin": "http://evil.example:7777"}
+    assert client.get("/config", headers=headers).status_code == 403
+    assert client.put("/config", json={"yaml": "x: 1"}, headers=headers).status_code == 403
+    assert client.get("/processes", headers={"Host": "evil.example"}).status_code == 403
+    assert companion_config.read_bytes() == before
+
+
+def test_loopback_hosts_allowed(companion_config: Path) -> None:
+    with TestClient(create_app(companion_config), base_url="http://127.0.0.1") as c:
+        for host in ("127.0.0.1:7777", "localhost:7777", "[::1]:7777", "localhost"):
+            assert c.get("/collectors", headers={"Host": host}).status_code == 200, host
+        own = {"Host": "localhost:7777", "Origin": "http://localhost:7777"}
+        assert c.post("/sessions", json={}, headers=own).status_code == 200

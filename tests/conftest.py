@@ -78,5 +78,6 @@ def client(companion_config: Path) -> Iterator[Any]:
 
     from steadygate.api import create_app
 
-    with TestClient(create_app(companion_config)) as c:
+    # The companion only answers to loopback Host headers, not TestClient's "testserver".
+    with TestClient(create_app(companion_config), base_url="http://127.0.0.1") as c:
         yield c

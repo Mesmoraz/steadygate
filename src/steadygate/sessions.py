@@ -8,6 +8,7 @@ store every ``flush_every_s`` so a crash loses at most that much data.
 from __future__ import annotations
 
 import builtins
+import logging
 import secrets
 import threading
 import time
@@ -21,6 +22,8 @@ from steadygate import collectors
 from steadygate.collectors import Collector
 from steadygate.models import Result, Status
 from steadygate.store import Store
+
+log = logging.getLogger(__name__)
 
 Clock = Callable[[], float]
 Wait = Callable[[threading.Event, float], bool]
@@ -131,7 +134,11 @@ class Sampler(threading.Thread):
             try:
                 batch.extend(c.sample(elapsed))
             except Exception as exc:  # a collector bug must show up as data, not vanish
-                batch.append(Result(f"t={int(elapsed)}", c.id, None, Status.ERROR, str(exc)))
+                # One ERROR per declared metric: a rule only counts errors for its own metric.
+                infos = getattr(c, "metric_infos", None)
+                names = [m.name for m in infos()] if callable(infos) else [c.id]
+                case = f"t={int(elapsed)}"
+                batch.extend(Result(case, n, None, Status.ERROR, str(exc)) for n in names)
         self.session.add(batch)
 
     def run(self) -> None:
@@ -141,8 +148,11 @@ class Sampler(threading.Thread):
         while not self.wait(self._stop_event, self.interval_s):
             self._tick(self.clock() - t0)
             if self.clock() - last_flush >= self.flush_every_s:
-                self.on_flush(self.session)
-                last_flush = self.clock()
+                try:
+                    self.on_flush(self.session)
+                    last_flush = self.clock()
+                except Exception:  # e.g. history.db locked; keep sampling, retry next tick
+                    log.warning("could not save samples for %s; will retry", self.session.id)
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -169,10 +179,13 @@ class SessionManager:
 
     def _flush(self, session: Session) -> None:
         with session._lock:
-            pending = session.results[session._flushed :]
-            session._flushed = len(session.results)
+            start = session._flushed
+            pending = session.results[start:]
         if pending:
             self.store.append_samples(session.id, pending)
+        # Only after the write succeeded, so a failed flush is retried, not lost.
+        with session._lock:
+            session._flushed = start + len(pending)
 
     def _save(self, s: Session) -> None:
         self.store.save_session(s.id, s.name, s.state.value, s.started_at, s.stopped_at, s.config)
@@ -230,9 +243,10 @@ class SessionManager:
 
     def push(self, session_id: str, items: builtins.list[tuple[str, float, str | None]]) -> int:
         session = self.get(session_id)
-        if session.state is not SessionState.RUNNING:
-            raise SessionError(f"session {session_id} is {session.state.value}", 409)
         with session._lock:
+            # Checked under the lock stop() uses, so no push lands after the final flush.
+            if session.state is not SessionState.RUNNING:
+                raise SessionError(f"session {session_id} is {session.state.value}", 409)
             for metric, value, case in items:
                 if case is None:
                     session._pushes += 1
@@ -240,7 +254,7 @@ class SessionManager:
                 session.results.append(Result(case, metric, value))
         return len(items)
 
-    def stop(self, session_id: str) -> Session:
+    def stop(self, session_id: str, final: SessionState = SessionState.STOPPED) -> Session:
         session = self.get(session_id)
         with self._lock:
             sampler = self._samplers.pop(session_id, None)
@@ -249,9 +263,10 @@ class SessionManager:
         sampler.stop()
         for c in sampler.sources:
             c.close()
+        with session._lock:
+            session.state = final
+            session.stopped_at = _now()
         self._flush(session)
-        session.state = SessionState.STOPPED
-        session.stopped_at = _now()
         self._save(session)
         return session
 
@@ -261,5 +276,6 @@ class SessionManager:
     def shutdown(self) -> None:
         with self._lock:
             running = builtins.list(self._samplers)
+        # The companion is going away mid-run: say so, exactly as after a crash.
         for session_id in running:
-            self.stop(session_id)
+            self.stop(session_id, SessionState.INTERRUPTED)

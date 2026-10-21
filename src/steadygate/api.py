@@ -33,6 +33,7 @@ from steadygate.store import Store
 
 API_VERSION = 1
 WEB_DIR = Path(__file__).parent / "web"
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 
 class CollectorSpec(BaseModel):
@@ -73,10 +74,18 @@ def _all_stats(session: Session) -> dict[str, Any]:
     return out
 
 
+def _hostname(host_header: str) -> str:
+    """``localhost:7777`` -> ``localhost``; ``[::1]:7777`` -> ``::1``."""
+    if host_header.startswith("["):
+        return host_header[1 : host_header.find("]")]
+    return host_header.rsplit(":", 1)[0] if host_header.count(":") == 1 else host_header
+
+
 def create_app(
     config_path: Path,
     manager: SessionManager | None = None,
     allow_origins: Sequence[str] = (),
+    allowed_hosts: Sequence[str] = (),
 ) -> FastAPI:
     cfg = config_mod.load(config_path)
     if manager is None:
@@ -95,13 +104,19 @@ def create_app(
     app.state.config = cfg
     app.state.config_path = config_path
     allowed = set(allow_origins)
+    hosts = LOOPBACK_HOSTS | set(allowed_hosts)
 
     @app.middleware("http")
     async def reject_foreign_origins(request: Request, call_next: Any) -> Response:
         # A web page on another site must not be able to drive the companion. Browsers
         # send Origin on cross-site requests; same-origin and non-browser clients pass.
+        # Check Host first: with DNS rebinding, evil.example resolves to 127.0.0.1 and its
+        # page's Origin then matches its own Host, so Host must be one of ours.
+        host = request.headers.get("host", "")
+        if _hostname(host) not in hosts:
+            return _error(403, f"host {host!r} is not allowed")
         origin = request.headers.get("origin")
-        own = f"{request.url.scheme}://{request.headers.get('host', '')}"
+        own = f"{request.url.scheme}://{host}"
         if origin and origin != own and origin not in allowed:
             return _error(403, f"origin {origin} is not allowed; start with --allow-origin")
         response: Response = await call_next(request)

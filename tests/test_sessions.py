@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Any
 
 import pytest
 
-from steadygate.collectors import Collector, CollectorError
+from steadygate.collectors import Collector, CollectorError, MetricInfo
 from steadygate.models import Result, Status
-from steadygate.sessions import SessionError, SessionManager, SessionState
+from steadygate.sessions import Session, SessionError, SessionManager, SessionState
 from steadygate.store import Store
 
 
@@ -195,3 +197,75 @@ def test_dicts(manager: SessionManager) -> None:
     ]
     assert detail["config"] == {"collectors": [], "interval_s": 1}
     assert s.metrics() == ["m"]
+
+
+class DeclaredFailingCollector(FakeCollector):
+    """Declares its metrics, as ProcessCollector does, and crashes on every sample."""
+
+    @staticmethod
+    def metric_infos() -> list[MetricInfo]:
+        return [MetricInfo("m"), MetricInfo("n")]
+
+
+def test_collector_crash_errors_every_declared_metric(store: Store, clock: FakeClock) -> None:
+    def build(collector_id: str, params: dict[str, Any]) -> Collector:
+        return DeclaredFailingCollector(fail=True)
+
+    m = SessionManager(store, clock=clock, wait=clock.wait, builder=build)
+    s = m.create("", [{"id": "x"}], 1)
+    _until(lambda: clock.ticks >= 2)
+    s = m.stop(s.id)
+    assert {r.metric for r in s.results} == {"m", "n"}
+    assert all(r.status is Status.ERROR for r in s.results)
+
+
+class FlakyStore(Store):
+    """append_samples fails the first time, like a history.db locked by another process."""
+
+    failures = 1
+
+    def append_samples(self, session_id: str, results: Sequence[Result]) -> None:
+        if self.failures:
+            self.failures -= 1
+            raise sqlite3.OperationalError("database is locked")
+        super().append_samples(session_id, results)
+
+
+def test_flush_failure_keeps_sampling_and_retries(tmp_path: Path) -> None:
+    store = FlakyStore(tmp_path / "h.db")
+    clock = FakeClock(max_ticks=4)
+    m = SessionManager(store, clock=clock, wait=clock.wait, builder=_builder([]), flush_every_s=0)
+    s = m.create("", [{"id": "fake"}], 1)
+    _until(lambda: clock.ticks >= 4)
+    s = m.stop(s.id)
+    assert s.ok_values("m") == [1.0, 2.0, 3.0]  # the sampler survived the failed flush
+    assert [r.value for r in store.load_samples(s.id)] == [1.0, 2.0, 3.0]  # nothing lost
+    store.close()
+
+
+def test_stopped_before_final_flush(manager: SessionManager) -> None:
+    s = manager.create("", [], 1)
+    seen: list[int] = []
+    original = manager._flush
+
+    def flush_and_try_push(session: Session) -> None:
+        # A push racing with stop must be refused once the final flush has started.
+        try:
+            manager.push(session.id, [("m", 1.0, None)])
+        except SessionError as exc:
+            seen.append(exc.status_code)
+        original(session)
+
+    manager._flush = flush_and_try_push  # type: ignore[method-assign]
+    manager.stop(s.id)
+    assert seen == [409]
+    assert manager.get(s.id).results == []
+
+
+def test_shutdown_marks_running_sessions_interrupted(store: Store, clock: FakeClock) -> None:
+    m = SessionManager(store, clock=clock, wait=clock.wait, builder=_builder([]))
+    s = m.create("", [], 1)
+    m.push(s.id, [("m", 1.0, None)])
+    m.shutdown()
+    assert store.load_sessions()[0]["state"] == "interrupted"
+    assert store.load_samples(s.id) == [Result("push-1", "m", 1.0)]

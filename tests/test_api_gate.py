@@ -72,7 +72,7 @@ def test_gate_record_only_on_pass(client: TestClient) -> None:
 def test_interrupted_session_gate_flag(companion_config: Path) -> None:
     with Store(companion_config.parent / "history.db") as store:
         store.save_session("s_0000abcd", "", "running", "2026-10-21T00:00:00+00:00", None, {})
-    with TestClient(create_app(companion_config)) as c:
+    with TestClient(create_app(companion_config), base_url="http://127.0.0.1") as c:
         r = c.post("/sessions/s_0000abcd/gate").json()
         assert r["interrupted"] is True
         assert c.get("/sessions/s_0000abcd").json()["state"] == "interrupted"

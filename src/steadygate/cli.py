@@ -94,7 +94,7 @@ def _serve(args: argparse.Namespace) -> int:
     if not _port_free(args.host, args.port):
         return _config_error(f"port {args.port} is in use; try --port")
     try:
-        app = create_app(args.config, allow_origins=args.allow_origin)
+        app = create_app(args.config, allow_origins=args.allow_origin, allowed_hosts=[args.host])
     except config.ConfigError as exc:
         return _config_error(str(exc))
     print(f"steadygate companion on http://{args.host}:{args.port}  (API docs: /docs)")
