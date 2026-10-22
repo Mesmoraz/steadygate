@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from steadygate.models import GateResult, Outcome, Verdict
 
@@ -68,27 +69,28 @@ def markdown(result: GateResult) -> str:
     return "\n".join(lines) + "\n"
 
 
+def as_dict(result: GateResult) -> dict[str, Any]:
+    return {
+        "verdict": _VERDICT_TEXT[result.verdict].lower().replace(" ", "_"),
+        "exit_code": int(result.verdict),
+        "total_results": result.total_results,
+        "rules": [
+            {
+                "rule": o.rule,
+                "metric": o.metric,
+                "required": o.required,
+                "outcome": o.outcome.value,
+                "detail": o.detail,
+                "observed": o.observed,
+                "baseline": o.baseline,
+            }
+            for o in result.outcomes
+        ],
+        "errors": [
+            {"case": r.case, "metric": r.metric, "message": r.message} for r in result.errors
+        ],
+    }
+
+
 def as_json(result: GateResult) -> str:
-    return json.dumps(
-        {
-            "verdict": _VERDICT_TEXT[result.verdict].lower().replace(" ", "_"),
-            "exit_code": int(result.verdict),
-            "total_results": result.total_results,
-            "rules": [
-                {
-                    "rule": o.rule,
-                    "metric": o.metric,
-                    "required": o.required,
-                    "outcome": o.outcome.value,
-                    "detail": o.detail,
-                    "observed": o.observed,
-                    "baseline": o.baseline,
-                }
-                for o in result.outcomes
-            ],
-            "errors": [
-                {"case": r.case, "metric": r.metric, "message": r.message} for r in result.errors
-            ],
-        },
-        indent=2,
-    )
+    return json.dumps(as_dict(result), indent=2)

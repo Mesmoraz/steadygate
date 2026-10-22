@@ -70,6 +70,72 @@ steadygate run candidate-regression.jsonl   # REGRESSION: -17.8%
 steadygate run candidate-broken.jsonl       # INCONCLUSIVE: one case's judge timed out
 ```
 
+## Companion: run it next to your app
+
+`steadygate serve` starts a small local service with an HTTP API that any language can call,
+plus a dashboard in your browser. It can sample a running process (CPU, memory, threads,
+handles) and also accept any metric your app sends, such as frame time, load time or eval
+score. It summarises them (mean, median, MAD, quartiles, p95), suggests a baseline from your
+history, and gives the same PASS / REGRESSION / INCONCLUSIVE verdict as the CLI.
+
+```bash
+pipx install "steadygate[companion]"
+steadygate serve                      # http://127.0.0.1:7777  (API docs at /docs)
+```
+
+Open the dashboard, pick a process, press **Start**, watch the charts, then **Stop**, **Record as
+baseline**, **Suggest baseline** and **Run gate**. To do the same from a script, see
+[`examples/companion/walkthrough.sh`](examples/companion/walkthrough.sh), which runs the whole
+flow with curl.
+
+### API
+
+Every response is JSON and includes `"api": 1`.
+
+| Method and path | What it does |
+|---|---|
+| `GET /collectors` | What this machine can gather, with units and which direction is better |
+| `GET /processes?q=` | Find a process to sample |
+| `POST /sessions` | Start a session: `{"collectors": [{"id": "process", "params": {"name": "myapp"}}], "interval_s": 1}`. Leave `collectors` empty to only push. |
+| `POST /sessions/{id}/metrics` | Push `{"metric", "value", "case"?}`, or a list of them |
+| `POST /sessions/{id}/stop` | Stop sampling; returns stats for every metric |
+| `GET /sessions/{id}/stats?metric=` | n, mean, median, MAD, stdev, min, p25, p75, p95, max |
+| `POST /sessions/{id}/record` | Add the session to the baseline history |
+| `GET /baseline/suggest?metric=` | A `relative_delta` rule sized from run-to-run noise (2× MAD/median, at least 5%) |
+| `POST /sessions/{id}/gate?record=` | The verdict, in the same shape as `steadygate run --json` plus `code` |
+| `GET /config`, `PUT /config` | Read or replace `steadygate.yml` (validated before it is written) |
+
+### Push metrics from any language
+
+```bash
+curl -X POST http://127.0.0.1:7777/sessions/$ID/metrics \
+  -H "content-type: application/json" -d '{"metric": "frame_ms", "value": 16.4}'
+```
+
+```python
+import json, urllib.request
+
+req = urllib.request.Request(
+    f"http://127.0.0.1:7777/sessions/{session_id}/metrics",
+    data=json.dumps({"metric": "frame_ms", "value": 16.4}).encode(),
+    headers={"content-type": "application/json"},
+)
+urllib.request.urlopen(req)
+```
+
+```js
+await fetch(`http://127.0.0.1:7777/sessions/${sessionId}/metrics`, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ metric: "frame_ms", value: 16.4 }),
+});
+```
+
+The companion listens on `127.0.0.1` only. It rejects requests from web pages on other origins
+unless you allow them with `--allow-origin http://localhost:3000`.
+
+Collectors for Android (over adb), web pages (a JS snippet) and iOS are next on the roadmap.
+
 ## Input formats
 
 | Format | Detected by | Produces |
@@ -98,17 +164,20 @@ change the verdict.
 - [ ] `mad_outlier` and `pass_rate` (Wilson interval over repeated trials)
 - [ ] Expected-case manifest: missing cases become INCONCLUSIVE
 - [ ] promptfoo / pytest-json / DeepEval adapters, PR-comment GitHub Action
-- [ ] `steadygate suggest` (propose thresholds from history) and `steadygate flaky`
+- [x] Companion: `steadygate serve` with HTTP API, process sampling, dashboard and baseline suggestions
+- [ ] Companion collectors for Android (adb), web (JS snippet) and iOS; LAN mode with pairing
+- [ ] `steadygate flaky`
 
 ## Development
 
 ```bash
 python -m venv .venv && . .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+pip install -e ".[dev,companion]"
 pytest && ruff check . && mypy
 ```
 
-Local-first: Steadygate makes no network calls and collects no telemetry.
+Local-first: Steadygate collects no telemetry. The CLI makes no network calls; the companion
+dashboard loads Chart.js from a CDN.
 
 ## License
 
