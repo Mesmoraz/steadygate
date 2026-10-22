@@ -98,6 +98,7 @@ function openSession(s) {
   state.session = s.id;
   for (const c of Object.values(state.charts)) c.chart.destroy();
   state.charts = {};
+  state.chartsFailed = false;
   $("charts").replaceChildren();
   $("verdict").hidden = true;
   $("outcomes").replaceChildren();
@@ -149,14 +150,27 @@ async function refresh() {
     byMetric[r.metric].labels.push(r.case);
     byMetric[r.metric].values.push(r.value);
   }
-  for (const [metric, series] of Object.entries(byMetric)) {
-    const chart = chartFor(metric);
-    chart.data.labels = series.labels;
-    chart.data.datasets[0].data = series.values;
-    chart.update();
-  }
+  drawCharts(byMetric);
   await renderStats();
   if (s.state !== "running") clearInterval(state.poll);
+}
+
+// Charts are a nice-to-have: if they can't be drawn, say so once and let the stats table,
+// baseline and gate keep working.
+function drawCharts(byMetric) {
+  if (state.chartsFailed) return;
+  try {
+    if (typeof Chart === "undefined") throw new Error("the chart library did not load");
+    for (const [metric, series] of Object.entries(byMetric)) {
+      const chart = chartFor(metric);
+      chart.data.labels = series.labels;
+      chart.data.datasets[0].data = series.values;
+      chart.update();
+    }
+  } catch (err) {
+    state.chartsFailed = true;
+    $("charts").replaceChildren(el("p", { className: "muted", textContent: `Charts unavailable: ${err.message}. The stats below are still live.` }));
+  }
 }
 
 async function renderStats() {

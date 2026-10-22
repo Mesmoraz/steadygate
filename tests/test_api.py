@@ -163,3 +163,13 @@ def test_loopback_hosts_allowed(companion_config: Path) -> None:
             assert c.get("/collectors", headers={"Host": host}).status_code == 200, host
         own = {"Host": "localhost:7777", "Origin": "http://localhost:7777"}
         assert c.post("/sessions", json={}, headers=own).status_code == 200
+
+
+def test_dashboard_needs_no_network(client: TestClient) -> None:
+    page = client.get("/").text
+    # Everything the page loads comes from the companion itself, so it works offline.
+    assert "http://" not in page and "https://" not in page
+    assert '<script src="vendor/chart.umd.min.js"' in page
+    chart = client.get("/vendor/chart.umd.min.js")
+    assert chart.status_code == 200
+    assert "Chart.js v4.4.1" in chart.text[:300]
