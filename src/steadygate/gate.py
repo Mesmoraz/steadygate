@@ -3,8 +3,48 @@
 from __future__ import annotations
 
 from steadygate.config import Config
-from steadygate.models import GateResult, Outcome, Result, Status, Verdict
+from steadygate.models import GateResult, Outcome, Result, RuleOutcome, Status, Verdict
 from steadygate.rules import Context, History
+
+_MAX_MISSING_SHOWN = 10
+
+
+def coverage(config: Config, results: list[Result]) -> RuleOutcome | None:
+    """Check every expected case reported every metric a required rule reads.
+
+    A case that crashed before writing its result, or a metric a run quietly stopped
+    emitting, otherwise just vanishes from the averages and the run looks green. Errored
+    and skipped results count as reported: the rules already deal with those.
+    """
+    if config.expected_cases is None:
+        return None
+    metrics = sorted({rule.metric for rule in config.rules if rule.required})
+    reported = {(r.case, r.metric) for r in results}
+    cases_seen = {r.case for r in results}
+
+    missing: list[str] = []
+    for case in config.expected_cases:
+        if case not in cases_seen:
+            missing.append(case)  # never ran, or crashed before reporting anything
+            continue
+        absent = [m for m in metrics if (case, m) not in reported]
+        if absent:
+            missing.append(f"{case} [{', '.join(absent)}]")  # ran, but dropped a metric
+
+    total = len(config.expected_cases)
+    if not missing:
+        return RuleOutcome(
+            "coverage", "*", True, Outcome.PASS, f"all {total}/{total} expected case(s) reported"
+        )
+    shown = ", ".join(missing[:_MAX_MISSING_SHOWN])
+    more = " ..." if len(missing) > _MAX_MISSING_SHOWN else ""
+    return RuleOutcome(
+        "coverage",
+        "*",
+        True,
+        Outcome.INCONCLUSIVE,
+        f"{len(missing)}/{total} expected case(s) missing: {shown}{more}",
+    )
 
 
 def evaluate(
@@ -13,13 +53,17 @@ def evaluate(
     """Run every rule and decide.
 
     * Any **required** rule FAILs -> REGRESSION
-    * else any **required** rule is INCONCLUSIVE -> INCONCLUSIVE
+    * else any **required** rule is INCONCLUSIVE (including missing expected cases)
+      -> INCONCLUSIVE
     * else -> PASS
 
     Optional rules are reported but never change the verdict.
     """
     ctx = Context(history, config.window, config.min_history, run_id)
     outcomes = [rule.evaluate(results, ctx) for rule in config.rules]
+    cov = coverage(config, results)
+    if cov is not None:
+        outcomes.insert(0, cov)
     required = [o for o in outcomes if o.required]
 
     if any(o.outcome is Outcome.FAIL for o in required):
