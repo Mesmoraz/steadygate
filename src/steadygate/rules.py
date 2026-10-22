@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, Protocol
 
 from steadygate.models import Outcome, Result, RuleOutcome, Status
+from steadygate.stats import mad, wilson
 
 
 class History(Protocol):
@@ -219,7 +220,189 @@ class RelativeDelta:
         return _guard_errors(outcome(o, summary, observed, baseline), errors)
 
 
-RULE_TYPES: dict[str, type[Absolute] | type[RelativeDelta]] = {
+_DIRECTIONS = ("higher_is_better", "lower_is_better")
+# Scales the MAD so it estimates the standard deviation of normally distributed data.
+MAD_SCALE = 1.4826
+
+
+@dataclass(frozen=True)
+class MadOutlier:
+    """The mean must not sit more than ``k`` scaled MADs from the median of recent runs.
+
+    Where ``relative_delta`` takes a fixed percentage, this rule sizes the limit from how
+    much the metric actually moves between runs: a noisy metric gets a wide band and a
+    steady one a narrow band. ``direction: both`` also fails a suspicious jump the
+    "good" way (a latency that suddenly halved is often a run that skipped work).
+    """
+
+    type_name: ClassVar[str] = "mad_outlier"
+
+    metric: str
+    k: float = 3.0
+    direction: str = "higher_is_better"
+    required: bool = True
+
+    @classmethod
+    def from_spec(cls, spec: dict[str, Any]) -> MadOutlier:
+        k = _number(spec, "k")
+        if k is not None and k <= 0:
+            raise ValueError("'k' must be a number > 0 (3 is a common choice)")
+        direction = spec.get("direction", "higher_is_better")
+        if direction not in (*_DIRECTIONS, "both"):
+            raise ValueError("'direction' must be 'higher_is_better', 'lower_is_better' or 'both'")
+        return cls(str(spec["metric"]), 3.0 if k is None else k, direction, _required(spec))
+
+    @property
+    def name(self) -> str:
+        return f"mad_outlier:{self.metric}"
+
+    def _worse(self, delta: float) -> float:
+        """How far ``delta`` (observed - baseline) points the bad way; <= 0 is fine."""
+        if self.direction == "both":
+            return abs(delta)
+        return -delta if self.direction == "higher_is_better" else delta
+
+    def evaluate(self, results: list[Result], ctx: Context) -> RuleOutcome:
+        ok, errors = _split(results, self.metric)
+
+        def outcome(
+            o: Outcome, detail: str, observed: float | None = None, baseline: float | None = None
+        ) -> RuleOutcome:
+            return RuleOutcome(self.name, self.metric, self.required, o, detail, observed, baseline)
+
+        if not ok:
+            return outcome(Outcome.INCONCLUSIVE, f"no usable '{self.metric}' results")
+        observed = statistics.fmean(r.value for r in ok if r.value is not None)
+
+        history = ctx.history.run_aggregates(self.metric, ctx.window, exclude_run=ctx.run_id)
+        if len(history) < ctx.min_history:
+            return outcome(
+                Outcome.NO_BASELINE,
+                f"{len(history)}/{ctx.min_history} baseline run(s) recorded; not gating yet",
+                observed,
+            )
+        baseline = float(statistics.median(history))
+        spread = MAD_SCALE * mad(history)
+        worse = self._worse(observed - baseline)
+
+        if spread == 0:
+            # Every past run gave the same value, so any move the bad way is outside history.
+            o = Outcome.FAIL if worse > 0 else Outcome.PASS
+            detail = (
+                f"{observed:.4g} vs baseline median {baseline:.4g}; history has no spread, "
+                f"so any change the wrong way fails (n={len(history)} runs)"
+            )
+        else:
+            z = (observed - baseline) / spread
+            o = Outcome.FAIL if worse / spread > self.k else Outcome.PASS
+            detail = (
+                f"{observed:.4g} vs baseline median {baseline:.4g} is {z:+.1f} MADs "
+                f"(limit {self.k:g}, MAD {spread:.3g}, n={len(history)} runs)"
+            )
+        return _guard_errors(outcome(o, detail, observed, baseline), errors)
+
+
+@dataclass(frozen=True)
+class PassRate:
+    """The pass rate over repeated trials must not be *confidently* below ``min``.
+
+    Each result is one trial: ``1`` passed, ``0`` failed. The rule fails only when the
+    whole Wilson interval sits below ``min``, so 7/10 against a 0.8 target (interval
+    0.40 to 0.89) passes with a note, while 3/10 (0.11 to 0.60) fails. More trials narrow
+    the interval and make the rule stricter. ``scope: case`` judges each case's trials
+    separately.
+    """
+
+    type_name: ClassVar[str] = "pass_rate"
+
+    metric: str
+    minimum: float
+    confidence: float = 0.95
+    scope: str = "aggregate"
+    required: bool = True
+
+    @classmethod
+    def from_spec(cls, spec: dict[str, Any]) -> PassRate:
+        minimum = _number(spec, "min")
+        if minimum is None or not 0 <= minimum <= 1:
+            raise ValueError("'min' must be a number between 0 and 1 (e.g. 0.8 for 80%)")
+        confidence = _number(spec, "confidence")
+        if confidence is not None and not 0 < confidence < 1:
+            raise ValueError("'confidence' must be between 0 and 1 (e.g. 0.95)")
+        scope = spec.get("scope", "aggregate")
+        if scope not in {"aggregate", "case"}:
+            raise ValueError("'scope' must be 'aggregate' or 'case'")
+        return cls(
+            str(spec["metric"]),
+            minimum,
+            0.95 if confidence is None else confidence,
+            scope,
+            _required(spec),
+        )
+
+    @property
+    def name(self) -> str:
+        return f"pass_rate:{self.metric}"
+
+    def _interval(self, passed: int, n: int) -> str:
+        lo, hi = wilson(passed, n, self.confidence)
+        return f"{passed}/{n} passed ({passed / n:.0%}, {self.confidence:.0%} CI {lo:.2f}-{hi:.2f})"
+
+    def _below(self, passed: int, n: int) -> bool:
+        return wilson(passed, n, self.confidence)[1] < self.minimum
+
+    def evaluate(self, results: list[Result], ctx: Context) -> RuleOutcome:
+        ok, errors = _split(results, self.metric)
+
+        def outcome(o: Outcome, detail: str, observed: float | None = None) -> RuleOutcome:
+            return RuleOutcome(self.name, self.metric, self.required, o, detail, observed)
+
+        if not ok:
+            return outcome(Outcome.INCONCLUSIVE, f"no usable '{self.metric}' results")
+        odd = [r.value for r in ok if r.value not in (0.0, 1.0)]
+        if odd:
+            return outcome(
+                Outcome.INCONCLUSIVE,
+                f"pass_rate needs pass/fail values of 0 or 1; got {odd[0]:g}",
+            )
+        passed, n = sum(1 for r in ok if r.value == 1.0), len(ok)
+        rate = passed / n
+        target = f"target {self.minimum:.0%}"
+
+        if self.scope == "case":
+            groups: dict[str, list[float]] = {}
+            for r in ok:
+                groups.setdefault(r.case, []).append(r.value or 0.0)
+            bad = [c for c, v in groups.items() if self._below(int(sum(v)), len(v))]
+            if bad:
+                names = ", ".join(
+                    f"{c} {int(sum(groups[c]))}/{len(groups[c])}" for c in bad[:5]
+                ) + (" ..." if len(bad) > 5 else "")
+                detail = f"{len(bad)}/{len(groups)} case(s) confidently below {target}: {names}"
+                return outcome(Outcome.FAIL, detail, rate)
+            res = outcome(
+                Outcome.PASS, f"no case of {len(groups)} is confidently below {target}", rate
+            )
+            return _guard_errors(res, errors)
+
+        lo, hi = wilson(passed, n, self.confidence)
+        summary = f"{self._interval(passed, n)}, {target}"
+        if hi < self.minimum:
+            return outcome(Outcome.FAIL, f"{summary}: confidently below", rate)
+        if lo >= self.minimum:
+            res = outcome(Outcome.PASS, f"{summary}: confidently meets it", rate)
+        else:
+            res = outcome(
+                Outcome.PASS,
+                f"{summary}: can't rule out a rate below target; more trials would tell",
+                rate,
+            )
+        return _guard_errors(res, errors)
+
+
+RULE_TYPES: dict[str, type[Absolute] | type[RelativeDelta] | type[MadOutlier] | type[PassRate]] = {
     Absolute.type_name: Absolute,
     RelativeDelta.type_name: RelativeDelta,
+    MadOutlier.type_name: MadOutlier,
+    PassRate.type_name: PassRate,
 }
