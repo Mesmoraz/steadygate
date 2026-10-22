@@ -5,6 +5,10 @@ store: .steadygate/history.db   # baseline history (relative to this file)
 window: 10                      # compare against the last 10 recorded runs
 min_history: 3                  # start gating once 3 runs are recorded
 
+# Every run must report these cases. One that crashed before writing a result makes the
+# run INCONCLUSIVE instead of quietly dropping out of the average.
+expected_cases: [refund-policy, shipping-faq, escalation, order-status, returns-window]
+
 rules:
   # Mean accuracy may not drop more than 5% below the baseline median.
   - type: relative_delta
