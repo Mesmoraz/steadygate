@@ -30,6 +30,7 @@ dev = [
   "types-PyYAML",
   "types-psutil",
   "httpx>=0.27",
+  "hypothesis>=6.100",
 ]
 companion = ["fastapi>=0.110", "uvicorn>=0.29", "psutil>=5.9"]
 

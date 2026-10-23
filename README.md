@@ -68,6 +68,11 @@ for i in 1 2 3; do steadygate record baseline-$i.jsonl --run-id base-$i; done
 steadygate run candidate-noise.jsonl        # PASS: -2.2% is within tolerance
 steadygate run candidate-regression.jsonl   # REGRESSION: -17.8%
 steadygate run candidate-broken.jsonl       # INCONCLUSIVE: one case's judge timed out
+steadygate run candidate-missing.jsonl      # INCONCLUSIVE: one case never reported at all
+
+cd ../trials                                # each case run 10 times
+steadygate run candidate-noise.jsonl        # PASS: 7/10 against an 80% target is noise
+steadygate run candidate-broken.jsonl       # REGRESSION: 3/10 is confidently below 80%
 ```
 
 ## Companion: run it next to your app
@@ -154,15 +159,41 @@ override detection.
 - **`relative_delta`**: the mean may not regress more than `max_regression` (a fraction)
   against the **median** of recent runs. The median keeps one bad past run from moving the
   baseline. Set `direction: lower_is_better` for latency, cost, or error counts.
+- **`mad_outlier`**: the mean may not sit more than `k` (default 3) scaled MADs from the
+  median of recent runs. The limit comes from how much the metric really moves between runs
+  (MAD × 1.4826 estimates the standard deviation, without letting one wild run inflate it),
+  so a noisy metric gets a wide band and a steady one a narrow band. `direction` is
+  `higher_is_better` (default), `lower_is_better` or `both`; `both` also catches suspicious
+  jumps the "good" way, such as a latency that halved because the run skipped work. If every
+  past run gave the same value, any change the wrong way fails.
+- **`pass_rate`**: for repeated trials, where each result is `1` (passed) or `0` (failed).
+  The rule fails only when the whole Wilson score interval (`confidence`, default 0.95) of
+  the pass rate is below `min`. So 7/10 against `min: 0.8` (interval 0.40 to 0.89) passes
+  with a note, while 3/10 (0.11 to 0.60) fails. More trials narrow the interval and make
+  the rule stricter. `scope: case` judges each case's trials on their own.
 
 Every rule takes `required: true|false` (default `true`). Optional rules are reported but never
 change the verdict.
 
+### Expected cases
+
+A crashed test often writes no result at all, so it quietly drops out of the average and
+the run looks green. List the cases every run must report, and any that are missing make the
+run **INCONCLUSIVE**:
+
+```yaml
+expected_cases: [refund-policy, shipping-faq, escalation]   # or: expected_cases: cases.txt
+```
+
+A file lists one case per line; blank lines and `#` comments are ignored. A case also
+counts as missing if it ran but dropped a metric that a required rule reads. Errored and
+skipped results count as reported, because the rules already handle them.
+
 ## Roadmap
 
 - [x] JSONL + JUnit adapters, SQLite baseline store, `absolute` + `relative_delta`, exit-code contract
-- [ ] `mad_outlier` and `pass_rate` (Wilson interval over repeated trials)
-- [ ] Expected-case manifest: missing cases become INCONCLUSIVE
+- [x] `mad_outlier` and `pass_rate` (Wilson interval over repeated trials)
+- [x] Expected-case manifest: missing cases become INCONCLUSIVE
 - [ ] promptfoo / pytest-json / DeepEval adapters, PR-comment GitHub Action
 - [x] Companion: `steadygate serve` with HTTP API, process sampling, dashboard and baseline suggestions
 - [ ] Companion collectors for Android (adb), web (JS snippet) and iOS; LAN mode with pairing

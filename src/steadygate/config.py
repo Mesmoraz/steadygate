@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ class Config:
     window: int = 10
     min_history: int = 3
     rules: list[Rule] = field(default_factory=list)
+    expected_cases: list[str] | None = None
 
 
 def _positive_int(raw: dict[str, Any], key: str, default: int) -> int:
@@ -32,10 +34,34 @@ def _positive_int(raw: dict[str, Any], key: str, default: int) -> int:
     return value
 
 
+_MANIFEST_HELP = (
+    "'expected_cases' must be a non-empty list of case names, "
+    "or a path to a file with one case name per line"
+)
+
+
+def _expected_cases(value: Any, base_dir: Path) -> list[str] | None:
+    """The cases every run must report. A file allows blank lines and ``#`` comments."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        path = Path(value) if Path(value).is_absolute() else base_dir / value
+        if not path.is_file():
+            raise ConfigError(f"expected_cases file not found: {path}")
+        lines = (line.strip() for line in path.read_text(encoding="utf-8").splitlines())
+        value = [line for line in lines if line and not line.startswith("#")]
+    if not isinstance(value, list) or not value or not all(isinstance(c, str) for c in value):
+        raise ConfigError(_MANIFEST_HELP)
+    dupes = sorted(c for c, n in Counter(value).items() if n > 1)
+    if dupes:
+        raise ConfigError(f"'expected_cases' has cases listed twice: {', '.join(dupes)}")
+    return value
+
+
 def parse(raw: Any, base_dir: Path = Path()) -> Config:
     if not isinstance(raw, dict):
         raise ConfigError("config must be a mapping")
-    unknown = set(raw) - {"store", "window", "min_history", "rules"}
+    unknown = set(raw) - {"store", "window", "min_history", "rules", "expected_cases"}
     if unknown:
         raise ConfigError(f"unknown top-level keys: {', '.join(sorted(unknown))}")
 
@@ -64,6 +90,7 @@ def parse(raw: Any, base_dir: Path = Path()) -> Config:
         window=_positive_int(raw, "window", 10),
         min_history=_positive_int(raw, "min_history", 3),
         rules=rules,
+        expected_cases=_expected_cases(raw.get("expected_cases"), base_dir),
     )
 
 

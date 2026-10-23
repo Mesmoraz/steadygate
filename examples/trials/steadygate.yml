@@ -1,0 +1,13 @@
+# An agent eval where every case runs 10 times. Each line of results is one trial:
+# {"case": ..., "metric": "passed", "value": 1 or 0}.
+store: .steadygate/history.db
+expected_cases: [book-flight, cancel-order, track-parcel]
+
+rules:
+  # Each case should pass at least 80% of the time. The rule fails a case only when the
+  # whole 95% Wilson interval of its pass rate is below 80%, so 7/10 (CI 0.40-0.89) is
+  # treated as noise while 3/10 (CI 0.11-0.60) is a real problem.
+  - type: pass_rate
+    metric: passed
+    min: 0.8
+    scope: case

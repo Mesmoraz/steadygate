@@ -6,6 +6,7 @@ moves them, which is why baselines are built on them rather than on the mean and
 
 from __future__ import annotations
 
+import math
 import statistics
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
@@ -57,3 +58,24 @@ def summarize(values: Iterable[float]) -> Summary:
         p95=_percentile(ordered, 0.95),
         max=ordered[-1],
     )
+
+
+def wilson(successes: int, n: int, confidence: float = 0.95) -> tuple[float, float]:
+    """Wilson score interval for a pass rate of ``successes`` out of ``n`` trials.
+
+    Unlike the plain ``p ± z·sqrt(p(1-p)/n)`` interval it stays inside [0, 1] and stays
+    honest at 0/n and n/n, which is exactly where small eval runs live.
+    (Wilson 1927; Brown, Cai & DasGupta 2001.)
+    """
+    if n < 1 or not 0 <= successes <= n:
+        raise ValueError(f"need 0 <= successes <= n and n >= 1, got {successes}/{n}")
+    if not 0 < confidence < 1:
+        raise ValueError(f"confidence must be between 0 and 1, got {confidence}")
+    z = statistics.NormalDist().inv_cdf(1 - (1 - confidence) / 2)
+    p = successes / n
+    denom = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / denom
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
+    lo = 0.0 if successes == 0 else max(0.0, centre - half)
+    hi = 1.0 if successes == n else min(1.0, centre + half)
+    return lo, hi
