@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Steadygate</title>
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="vendor/chart.umd.min.js"></script>
 </head>
 <body>
   <header>
@@ -30,6 +30,13 @@
       </div>
       <button id="start" class="primary">Start session</button>
       <p id="start-error" class="error" hidden></p>
+    </section>
+
+    <section id="sessions-panel" class="card">
+      <h2>Sessions</h2>
+      <p class="muted">Every session on this companion, including ones your app or scripts started. Pick one to watch it.</p>
+      <ul id="sessions" class="picker sessions"></ul>
+      <p id="sessions-empty" class="muted" hidden>No sessions yet. Start one above, or from your app with <code>POST /sessions</code>.</p>
     </section>
 
     <section id="live" class="card" hidden>

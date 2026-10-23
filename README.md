@@ -176,8 +176,8 @@ pip install -e ".[dev,companion]"
 pytest && ruff check . && mypy
 ```
 
-Local-first: Steadygate collects no telemetry. The CLI makes no network calls; the companion
-dashboard loads Chart.js from a CDN.
+Local-first: Steadygate makes no network calls and collects no telemetry. The companion
+dashboard ships its own copy of Chart.js (MIT), so it works offline.
 
 ## License
 
