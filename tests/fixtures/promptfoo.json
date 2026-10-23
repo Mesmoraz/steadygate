@@ -1,0 +1,28 @@
+{
+  "evalId": "eval-abc-2026-10-22T00:00:00",
+  "results": {
+    "version": 3,
+    "timestamp": "2026-10-22T00:00:00.000Z",
+    "prompts": [{"raw": "Answer: {{question}}", "label": "concise"}],
+    "results": [
+      {"promptIdx": 0, "testIdx": 0, "testCase": {"description": "refund policy", "vars": {}},
+       "prompt": {"raw": "Answer: {{question}}", "label": "concise"},
+       "provider": {"id": "openai:gpt-4o-mini", "label": ""},
+       "success": true, "score": 1, "latencyMs": 812, "cost": 0.0004, "failureReason": 0,
+       "namedScores": {"helpfulness": 0.9, "flag": true}},
+      {"promptIdx": 0, "testIdx": 0, "testCase": {"description": "refund policy", "vars": {}},
+       "prompt": {"raw": "Answer: {{question}}", "label": "concise"},
+       "provider": {"id": "openai:gpt-4o-mini", "label": ""},
+       "success": false, "score": 0.25, "latencyMs": 640, "failureReason": 1,
+       "error": "Expected output to contain \"30 days\""},
+      {"promptIdx": 0, "testIdx": 1, "testCase": {"vars": {"question": "where is my parcel"}},
+       "prompt": {"raw": "Answer: {{question}}", "label": "concise"},
+       "provider": {"id": "openai:gpt-4o-mini", "label": ""},
+       "success": false, "score": 0, "failureReason": 2,
+       "error": "API error: 429 Too Many Requests"}
+    ],
+    "stats": {"successes": 1, "failures": 1, "errors": 1}
+  },
+  "config": {},
+  "shareableUrl": null
+}

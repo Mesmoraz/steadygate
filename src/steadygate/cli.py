@@ -24,7 +24,11 @@ def _default_run_id() -> str:
 
 
 def _add_common(p: argparse.ArgumentParser) -> None:
-    p.add_argument("results", type=Path, help="results file (JUnit XML or JSONL)")
+    p.add_argument(
+        "results",
+        type=Path,
+        help="results file (JUnit XML, JSONL, pytest-json-report or promptfoo JSON)",
+    )
     p.add_argument("--format", choices=sorted(ADAPTERS), help="override format detection")
     p.add_argument(
         "-c", "--config", type=Path, default=Path(config.DEFAULT_CONFIG), help="config file"
