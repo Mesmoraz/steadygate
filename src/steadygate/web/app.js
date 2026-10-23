@@ -105,14 +105,61 @@ function openSession(s) {
   $("suggest-yaml").hidden = $("apply").hidden = true;
   $("suggest-why").textContent = $("baseline-msg").textContent = $("runs").textContent = "";
   $("session-id").textContent = s.id;
-  $("target").textContent = state.target
-    ? `Sampling ${state.target.name} (pid ${state.target.pid}) and accepting pushed metrics.`
-    : "Push-only session: send metrics from your app (see below).";
+  $("target").textContent = describeTarget(s);
   for (const id of ["live", "stats-panel", "baseline-panel", "gate-panel", "snippets-panel"]) $(id).hidden = false;
   renderSnippet();
   clearInterval(state.poll);
   refresh();
   state.poll = setInterval(refresh, 1000);
+  loadSessions();
+}
+
+// What a session gathers, from its own config, so sessions started elsewhere read the same.
+function describeTarget(s) {
+  const proc = ((s.config && s.config.collectors) || []).find((c) => c.id === "process");
+  if (!proc) return "Push-only session: send metrics from your app (see below).";
+  const p = { ...(proc.params || {}) };
+  if (!p.name && state.target && state.target.pid === p.pid) p.name = state.target.name;
+  const what = p.name && p.pid ? `${p.name} (pid ${p.pid})` : p.name || `pid ${p.pid}`;
+  return `Sampling ${what} and accepting pushed metrics.`;
+}
+
+// --- sessions list ------------------------------------------------------------------
+
+function since(iso) {
+  const secs = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+  if (secs < 60) return "just now";
+  if (secs < 3600) return `${Math.floor(secs / 60)} min ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)} h ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+async function loadSessions() {
+  let sessions;
+  try {
+    ({ sessions } = await api("GET", "sessions"));
+  } catch {
+    return; // the companion is restarting; the next poll tries again
+  }
+  $("sessions-empty").hidden = sessions.length > 0;
+  $("sessions").replaceChildren(
+    ...sessions.slice(0, 15).map((s) => {
+      const li = el("li", { tabIndex: 0, className: s.id === state.session ? "selected" : "" },
+        el("b", { textContent: s.name || s.id }),
+        " ",
+        el("span", { className: `pill ${s.state}`, textContent: s.state }),
+        el("span", { className: "muted", textContent: `  ${s.samples} values · started ${since(s.started_at)}` }));
+      const open = async () => openSession(await api("GET", `sessions/${s.id}`));
+      li.addEventListener("click", open);
+      li.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+      return li;
+    }),
+  );
+  // Visiting the page while something is running shows it straight away.
+  if (!state.session) {
+    const running = sessions.find((s) => s.state === "running");
+    if (running) openSession(await api("GET", `sessions/${running.id}`));
+  }
 }
 
 // --- live view ----------------------------------------------------------------------
@@ -275,3 +322,5 @@ $("copy").addEventListener("click", async () => {
 });
 
 loadCollectors();
+loadSessions();
+setInterval(loadSessions, 3000);
