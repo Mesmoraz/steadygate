@@ -50,6 +50,11 @@ async function initInstall(doc, fetchFn) {
       btn.className = "install-soon";
       btn.innerHTML =
         "Coming soon. For now: <code>pip install git+https://github.com/Mesmoraz/steadygate</code>";
+      // No release yet: hide the other download links and the unsigned-app notes too.
+      const downloads = doc.querySelector ? doc.querySelector(".downloads") : null;
+      const note = doc.getElementById("install-note");
+      if (downloads) downloads.hidden = true;
+      if (note) note.hidden = true;
     }
   } catch (err) {
     // Offline, rate-limited or blocked: keep the download link as it is.

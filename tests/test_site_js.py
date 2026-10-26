@@ -202,19 +202,22 @@ def test_release_api() -> None:
     )
 
 
-def _init_install(os_args: dict[str, str], fetch_body: str) -> Any:
-    """Run initInstall against a tiny fake document and a fake fetch; return the final state."""
+def _init_install_page(os_args: dict[str, str], fetch_body: str) -> Any:
+    """Run initInstall against a tiny fake document and a fake fetch; return every element."""
     script = f"""
 const m = require({json.dumps(str(INSTALL_JS))});
 const btn = {{href: "#install", textContent: "Install now", innerHTML: "", hidden: false}};
+const note = {{hidden: false}};
+const downloads = {{hidden: false}};
 const doc = {{
-  getElementById: (id) => (id === "install-now" ? btn : null),
+  getElementById: (id) => ({{"install-now": btn, "install-note": note}})[id] || null,
+  querySelector: (sel) => (sel === ".downloads" ? downloads : null),
   defaultView: {{navigator: {json.dumps(os_args)}}},
 }};
 const fetchFn = {fetch_body};
 (async () => {{
   await m.initInstall(doc, fetchFn);
-  console.log(JSON.stringify(btn));
+  console.log(JSON.stringify({{btn, note, downloads}}));
 }})();
 """
     assert NODE is not None
@@ -222,6 +225,10 @@ const fetchFn = {fetch_body};
         [NODE, "-e", script], capture_output=True, text=True, encoding="utf-8", check=True
     ).stdout
     return json.loads(out)
+
+
+def _init_install(os_args: dict[str, str], fetch_body: str) -> Any:
+    return _init_install_page(os_args, fetch_body)["btn"]
 
 
 WIN = {"platform": "Win32", "userAgent": "Mozilla/5.0 (Windows NT 10.0)"}
@@ -247,6 +254,12 @@ def test_init_install_404_swaps_in_coming_soon() -> None:
     assert "pip install git+https://github.com/Mesmoraz/steadygate" in btn["innerHTML"]
 
 
+def test_init_install_404_hides_the_downloads_and_install_note() -> None:
+    page = _init_install_page(WIN, "async () => ({ok: false, status: 404})")
+    assert page["downloads"]["hidden"] is True
+    assert page["note"]["hidden"] is True
+
+
 @pytest.mark.parametrize(
     "fetch_body",
     [
@@ -257,7 +270,10 @@ def test_init_install_404_swaps_in_coming_soon() -> None:
     ],
 )
 def test_init_install_other_failures_change_nothing(fetch_body: str) -> None:
-    btn = _init_install(WIN, fetch_body)
+    page = _init_install_page(WIN, fetch_body)
+    assert page["downloads"] == {"hidden": False}
+    assert page["note"] == {"hidden": False}
+    btn = page["btn"]
     assert btn["href"] == RELEASE_URL + "steadygate-setup-windows.exe"
     assert btn["textContent"] == "Install for Windows"
     assert btn["innerHTML"] == ""

@@ -31,8 +31,9 @@
       </div>
       <p class="install-note" id="install-note"><a href="#install">Other platforms</a> and
         <code>pip install</code> are in the install section. Windows may say "Windows protected
-        your PC": choose More info &rarr; Run anyway. On a Mac, right-click the app and choose
-        Open.</p>
+        your PC": choose More info &rarr; Run anyway. Mac: Unzip it, then open the app. If macOS
+        says it can't be checked, go to System Settings &rarr; Privacy &amp; Security and choose
+        Open Anyway.</p>
     </div>
   </header>
 
@@ -172,9 +173,13 @@
       <h2 id="install-title">Add it to your repo</h2>
       <ul class="downloads" aria-label="Downloads">
         <li><a class="btn" href="https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-windows.exe">Download for Windows</a></li>
-        <li><a class="btn" href="https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-macos.zip">Download for Mac</a></li>
+        <li><a class="btn" href="https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-macos.zip">Download for Mac (Apple silicon)</a>
+          <span class="download-note">Unzip it, then open the app. If macOS says it can't be
+            checked, go to System Settings &rarr; Privacy &amp; Security and choose Open Anyway.
+            On an Intel Mac, install with pip instead.</span></li>
         <li><a class="btn" href="https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-linux">Download for Linux</a>
-          <span class="download-note">Run <code>chmod +x steadygate-setup-linux</code> first.</span></li>
+          <span class="download-note">For x86_64 (64-bit Intel/AMD). Run
+            <code>chmod +x steadygate-setup-linux</code> first.</span></li>
       </ul>
       <p class="section-lede">Or install with pip, then set up a project:</p>
       <div class="code-card">

@@ -42,12 +42,14 @@ If your tests give the same answer every time, a plain pass/fail is all you need
 Download the installer for your system:
 
 - [Windows](https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-windows.exe)
-- [Mac](https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-macos.zip)
-- [Linux](https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-linux)
-  (run `chmod +x steadygate-setup-linux` first)
+- [Mac (Apple silicon)](https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-macos.zip).
+  On an Intel Mac, install with pip instead.
+- [Linux](https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-linux),
+  for x86_64 (64-bit Intel/AMD) (run `chmod +x steadygate-setup-linux` first)
 
 The builds are not signed yet. Windows may say "Windows protected your PC": choose
-More info, then Run anyway. On a Mac, right-click the app and choose Open.
+More info, then Run anyway. Mac: Unzip it, then open the app. If macOS says it can't be
+checked, go to System Settings → Privacy & Security and choose Open Anyway.
 
 Then, in your project folder, set it up:
 

@@ -1161,6 +1161,10 @@ p {
   align-items: center;
 }
 
+.downloads[hidden] {
+  display: none;
+}
+
 .downloads li {
   display: flex;
   flex-wrap: wrap;
