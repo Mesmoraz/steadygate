@@ -151,10 +151,57 @@ Collectors for Android (over adb), web pages (a JS snippet) and iOS are next on 
 |---|---|---|
 | **JSONL** | `.jsonl`, `.ndjson` | `{"case", "metric", "value", "status"?, "message"?}` per line |
 | **JUnit XML** | `.xml` | `passed` (1/0) and `duration_s` per test case; `<error>` is treated as a broken run, `<skipped>` is ignored |
+| **pytest-json-report** | `.json` with a `tests` list | `passed` and `duration_s` per test, plus every number the test stored with `json_metadata`; setup/teardown errors are a broken run |
+| **promptfoo** | `.json` with a `results` key | `passed`, `score`, `latency_ms`, `cost` and each `namedScores` metric per test (× prompt × provider); provider errors and timeouts are a broken run, not a regression |
 
 JUnit covers pytest (`--junitxml`), Jest, Playwright, Vitest, Maven and most CI tools.
-Adapters for promptfoo, DeepEval and pytest-json-report are on the roadmap. Use `--format` to
-override detection.
+A DeepEval adapter is on the roadmap. Use `--format` (`jsonl`, `junit`, `pytest-json`,
+`promptfoo`) to override detection.
+
+## GitHub Action
+
+```yaml
+# .github/workflows/eval.yml
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write        # for the PR comment
+    steps:
+      - uses: actions/checkout@v4
+      - run: npx promptfoo eval --repeat 5 --output results.json   # or pytest, Jest, ...
+      - uses: Mesmoraz/steadygate@main
+        with:
+          results: results.json
+```
+
+On pushes to the default branch, a passing run is added to the history. On pull requests the
+run is gated against that history without changing it, and the report is posted as one PR
+comment that is updated on each push. The history lives in the Actions cache, so there is
+nothing to host.
+
+| Input | Default | |
+|---|---|---|
+| `results` | (required) | Results file to gate |
+| `config` | `steadygate.yml` | Relative to `working-directory` |
+| `format` | detected | `jsonl`, `junit`, `pytest-json` or `promptfoo` |
+| `working-directory` | `.` | |
+| `record` | `auto` | `auto` records passing runs on default-branch pushes only; or `true` / `false` |
+| `history-cache` | `true` | Keep the history store in the Actions cache |
+| `cache-key` | `steadygate-history` | Use a different one for each gate in a repository |
+| `comment` | `true` | Post the report on pull requests |
+| `package` | this action's copy | A pip requirement, to pin a released version |
+
+Outputs are `verdict` (`pass`, `regression`, `inconclusive`, `config-error`), `exit-code` and
+`report` (path to the markdown). The step fails on any non-zero code; add
+`continue-on-error: true` to keep going and branch on `verdict`. The report is always written
+to the job summary, which also covers PRs from forks, where the token cannot comment.
 
 ## Rules
 
@@ -198,7 +245,8 @@ skipped results count as reported, because the rules already handle them.
 - [x] JSONL + JUnit adapters, SQLite baseline store, `absolute` + `relative_delta`, exit-code contract
 - [x] `mad_outlier` and `pass_rate` (Wilson interval over repeated trials)
 - [x] Expected-case manifest: missing cases become INCONCLUSIVE
-- [ ] promptfoo / pytest-json / DeepEval adapters, PR-comment GitHub Action
+- [x] promptfoo and pytest-json-report adapters, PR-comment GitHub Action
+- [ ] DeepEval adapter
 - [x] Companion: `steadygate serve` with HTTP API, process sampling, dashboard and baseline suggestions
 - [ ] Companion collectors for Android (adb), web (JS snippet) and iOS; LAN mode with pairing
 - [ ] `steadygate flaky`
