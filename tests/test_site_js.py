@@ -159,3 +159,9 @@ def test_markdown_escaping() -> None:
     assert "&amp;" in html
     assert "&quot;" in html
     assert "&#39;" in html
+
+
+def test_markdown_unescapes_pipes_in_list_items() -> None:
+    html = render("- `x` [accuracy] a \| b\n")
+    assert "a | b" in html
+    assert "\|" not in html

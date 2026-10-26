@@ -57,7 +57,7 @@ function renderMarkdown(md) {
     } else if (line.startsWith("- ")) {
       const items = [];
       while (i < lines.length && lines[i].startsWith("- ")) {
-        items.push("<li>" + inline(lines[i].slice(2)) + "</li>");
+        items.push("<li>" + inline(lines[i].slice(2).replace(/\\\|/g, "|")) + "</li>");
         i++;
       }
       out.push("<ul>" + items.join("") + "</ul>");
