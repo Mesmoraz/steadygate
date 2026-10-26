@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Steadygate live demo</title>
+  <meta name="description" content="A statistical release gate for LLM evals and flaky tests. See it pass noise, fail a real regression and refuse to call a crash a pass, right in your browser.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%233b5bdb'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11.5' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip" href="#demo">Skip to the demo</a>
+
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow">Steadygate</p>
+      <h1><span>Your eval passed.</span> <span>Your agent got worse.</span></h1>
+      <p class="lede">Steadygate is a statistical release gate for LLM evals and flaky tests.
+        It compares each run against your own history, so noise passes, a real drop fails,
+        and a crashed case is never a silent green.</p>
+      <ul class="verdicts" aria-label="The three verdicts">
+        <li class="verdict-chip is-pass"><span aria-hidden="true">✅</span> <strong>PASS</strong> <span class="exit">exit 0</span><span class="chip-note">within normal noise</span></li>
+        <li class="verdict-chip is-fail"><span aria-hidden="true">❌</span> <strong>REGRESSION</strong> <span class="exit">exit 1</span><span class="chip-note">worse, not noise</span></li>
+        <li class="verdict-chip is-warn"><span aria-hidden="true">⚠️</span> <strong>INCONCLUSIVE</strong> <span class="exit">exit 2</span><span class="chip-note">errored or missing results</span></li>
+      </ul>
+      <div class="cta">
+        <a class="btn btn-primary" href="#demo">Try it</a>
+        <a class="btn" href="https://github.com/Mesmoraz/steadygate">View on GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="how wrap" aria-labelledby="how-title">
+      <h2 id="how-title">How it works</h2>
+      <ol class="steps">
+        <li class="step">
+          <svg class="step-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+            <rect x="5" y="9" width="38" height="30" rx="4" fill="none" stroke="currentColor" stroke-width="2.5"/>
+            <path d="M5 16h38" stroke="currentColor" stroke-width="2.5"/>
+            <path d="M12 24l5 4-5 4" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M21 32h10" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+          <div>
+            <h3><span class="step-num">1</span> Your eval tool runs</h3>
+            <p>Keep promptfoo, pytest, JUnit or plain JSONL. Steadygate sits on top of the
+              framework you already use and reads its results file.</p>
+          </div>
+        </li>
+        <li class="step">
+          <svg class="step-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+            <rect x="6" y="8" width="36" height="32" rx="4" fill="none" stroke="currentColor" stroke-width="2.5"/>
+            <path d="M6 18h36M6 29h36M19 8v32" stroke="currentColor" stroke-width="2"/>
+            <circle cx="31" cy="34.5" r="2.6" fill="var(--warn)"/>
+            <circle cx="31" cy="23.5" r="2.6" fill="var(--pass)"/>
+          </svg>
+          <div>
+            <h3><span class="step-num">2</span> An adapter normalises results</h3>
+            <p>Every result becomes a <code>case · metric · value · status</code> row.
+              A crash or a judge timeout becomes <code>error</code>, not a missing number.</p>
+          </div>
+        </li>
+        <li class="step">
+          <svg class="step-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+            <path d="M6 40h36" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M6 22h36" stroke="var(--accent)" stroke-width="2.5"/>
+            <path d="M6 29h36" stroke="var(--muted)" stroke-width="2" stroke-dasharray="3 3"/>
+            <circle cx="12" cy="20" r="3" fill="currentColor"/>
+            <circle cx="20" cy="24" r="3" fill="currentColor"/>
+            <circle cx="28" cy="21" r="3" fill="currentColor"/>
+            <circle cx="37" cy="23" r="3.6" fill="none" stroke="var(--pass)" stroke-width="2.5"/>
+          </svg>
+          <div>
+            <h3><span class="step-num">3</span> History is the baseline</h3>
+            <p>Passing runs from <code>main</code> are recorded. Each new run is compared
+              against the median of recent runs, not a fixed number someone guessed once.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section id="demo" class="demo" aria-labelledby="demo-title">
+      <div class="wrap">
+        <h2 id="demo-title">Try it</h2>
+        <p class="section-lede">Pick a run and see what the gate says. These are the repo's own
+          example files, gated by the real Steadygate CLI.</p>
+        <div class="demo-grid">
+          <div class="demo-pick">
+            <div class="suite-tabs" id="suite-tabs" role="group" aria-label="Example suite"></div>
+            <div class="scenarios" id="scenarios" role="group" aria-label="Scenario"></div>
+          </div>
+          <div class="demo-knobs">
+            <p class="status-note" id="engine-status" role="status"></p>
+            <div class="knobs" id="knobs"></div>
+          </div>
+          <div class="demo-output" id="output" aria-live="polite">
+            <p class="loading">Loading scenarios…</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="how wrap" aria-labelledby="how-title-2">
+      <h2 id="how-title-2" class="visually-hidden">How it works, continued</h2>
+      <ol class="steps" start="4">
+        <li class="step">
+          <svg class="step-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+            <rect x="8" y="6" width="32" height="36" rx="4" fill="none" stroke="currentColor" stroke-width="2.5"/>
+            <path d="M14 16l3 3 5-6M14 27l3 3 5-6" fill="none" stroke="var(--pass)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M14 36h4" stroke="var(--fail)" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M26 16h8M26 27h8M26 36h8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+          <div>
+            <h3><span class="step-num">4</span> Rules decide</h3>
+            <p><code>relative_delta</code>, <code>absolute</code>, <code>mad_outlier</code> and
+              <code>pass_rate</code> check the run. Required rules block the release;
+              optional ones are reported without changing the verdict.</p>
+          </div>
+        </li>
+        <li class="step">
+          <svg class="step-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+            <path d="M8 9h32a3 3 0 0 1 3 3v19a3 3 0 0 1-3 3H22l-8 7v-7H8a3 3 0 0 1-3-3V12a3 3 0 0 1 3-3z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+            <circle cx="15" cy="21.5" r="3" fill="var(--pass)"/>
+            <circle cx="24" cy="21.5" r="3" fill="var(--fail)"/>
+            <circle cx="33" cy="21.5" r="3" fill="var(--warn)"/>
+          </svg>
+          <div>
+            <h3><span class="step-num">5</span> One verdict, one exit code, one PR comment</h3>
+            <p>PASS, REGRESSION or INCONCLUSIVE, as exit code 0, 1 or 2, so CI can act on it.
+              The same report lands on the pull request as a comment.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section class="install wrap" aria-labelledby="install-title">
+      <h2 id="install-title">Add it to your repo</h2>
+      <p class="section-lede">Run your evals as usual, then hand the results file to the
+        Steadygate action. Runs on <code>main</code> build the history; pull requests get the
+        verdict and a comment.</p>
+      <div class="code-card">
+        <div class="code-head"><span>.github/workflows/steadygate.yml</span></div>
+<pre><code>name: steadygate
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: npx promptfoo eval --repeat 5 --output results.json  # or pytest, Jest, ...
+      - uses: Mesmoraz/steadygate@main
+        with:
+          results: results.json</code></pre>
+      </div>
+      <p class="links">
+        <a href="https://github.com/Mesmoraz/steadygate#quick-start">Quick start in the README</a>
+        <span aria-hidden="true">·</span>
+        <a href="https://github.com/Mesmoraz/steadygate#try-the-example">Run the example locally</a>
+      </p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p class="footer-note">Runs entirely in your browser. Nothing is sent anywhere.</p>
+      <p class="footer-links">
+        <a href="https://github.com/Mesmoraz/steadygate">github.com/Mesmoraz/steadygate</a>
+        <span aria-hidden="true">·</span>
+        <a href="https://github.com/Mesmoraz/steadygate/blob/main/LICENSE">MIT licence</a>
+      </p>
+    </div>
+  </footer>
+
+  <script src="knobs.js"></script>
+  <script src="markdown.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
