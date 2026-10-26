@@ -79,3 +79,33 @@ def test_os_name_mapping() -> None:
     assert wizard.os_name_for("win32") == "windows"
     assert wizard.os_name_for("darwin") == "macos"
     assert wizard.os_name_for("linux") == "linux"
+
+
+class _FakeRoot:
+    def __init__(self) -> None:
+        self.looped = False
+
+    def title(self, _: str) -> None: ...
+
+    def geometry(self, _: str) -> None: ...
+
+    def resizable(self, *_: bool) -> None: ...
+
+    def mainloop(self) -> None:
+        self.looped = True
+
+
+def test_callback_errors_are_shown_not_swallowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _FakeRoot()
+    shown: list[tuple[str, str]] = []
+    monkeypatch.setattr(wizard.tk, "Tk", lambda: root)
+    monkeypatch.setattr(wizard, "_App", lambda r: None)
+    monkeypatch.setattr(
+        wizard.messagebox, "showerror", lambda title, message, **_: shown.append((title, message))
+    )
+    wizard._run_gui()
+    assert root.looped
+    handler = root.report_callback_exception  # type: ignore[attr-defined]
+    exc = RuntimeError("disk full")
+    handler(RuntimeError, exc, None)
+    assert shown == [("Steadygate setup", "disk full")]

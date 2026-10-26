@@ -212,6 +212,9 @@ class _App:
             if s.errors():
                 return
             registry = WinRegistry() if self.os_name == "windows" else None
+            button.state(["disabled"])
+            result.configure(text="Installing…", foreground="")
+            self.root.update_idletasks()
             try:
                 done = run_install(
                     embedded_cli(),
@@ -226,6 +229,8 @@ class _App:
                 result.configure(text=str(exc), foreground=_RED)
                 button.configure(text="Retry")
                 return
+            finally:
+                button.state(["!disabled"])
             s.installed = done
             note = "PATH updated." if done.path_changed else "PATH not changed."
             result.configure(text=f"Installed {done.binary}\n{note}", foreground="")
@@ -368,6 +373,13 @@ def _run_gui() -> None:
     root.title("Steadygate setup")
     root.geometry("560x420")
     root.resizable(False, False)
+
+    def show_error(exc_type: type[BaseException], exc: BaseException, tb: object) -> None:
+        # The --windowed build has no console, so an uncaught callback error would be silent.
+        message = str(exc) or exc_type.__name__
+        messagebox.showerror("Steadygate setup", message, parent=root)
+
+    root.report_callback_exception = show_error
     _App(root)
     root.mainloop()
 
