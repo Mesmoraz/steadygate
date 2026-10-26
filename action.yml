@@ -1,0 +1,164 @@
+name: Steadygate
+description: Statistical release gate for LLM evals and flaky test suites. PASS, REGRESSION or INCONCLUSIVE, against your own history.
+author: Taylor Philpott
+branding:
+  icon: shield
+  color: green
+
+inputs:
+  results:
+    description: Results file to gate (JUnit XML, JSONL, pytest-json-report or promptfoo JSON).
+    required: true
+  config:
+    description: Path to steadygate.yml, relative to working-directory.
+    default: steadygate.yml
+  format:
+    description: Override format detection (jsonl, junit, pytest-json, promptfoo).
+    default: ""
+  working-directory:
+    description: Directory to run in.
+    default: "."
+  record:
+    description: >-
+      Add a passing run to the baseline history. "auto" records on pushes to the default
+      branch only, so pull requests are gated against main's history without changing it.
+    default: auto
+  history-cache:
+    description: Keep the history store between runs with the Actions cache.
+    default: "true"
+  cache-key:
+    description: Cache key prefix. Use a different one for each gate in the same repository.
+    default: steadygate-history
+  comment:
+    description: On pull requests, post the report as a comment and update it on each push.
+    default: "true"
+  github-token:
+    description: Token used to post the PR comment. Needs pull-requests write permission.
+    default: ${{ github.token }}
+  python-version:
+    description: Python version to run Steadygate with.
+    default: "3.12"
+  package:
+    description: pip requirement to install. Empty installs the copy that ships with this action.
+    default: ""
+
+outputs:
+  verdict:
+    description: pass, regression, inconclusive or config-error.
+    value: ${{ steps.gate.outputs.verdict }}
+  exit-code:
+    description: 0 PASS, 1 REGRESSION, 2 INCONCLUSIVE, 3 config error.
+    value: ${{ steps.gate.outputs.exit-code }}
+  report:
+    description: Path to the markdown report.
+    value: ${{ steps.gate.outputs.report }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install Steadygate
+      shell: bash
+      env:
+        PACKAGE: ${{ inputs.package }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: python -m pip install --quiet --disable-pip-version-check "${PACKAGE:-$ACTION_PATH}"
+
+    - name: Locate history store
+      id: store
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CONFIG: ${{ inputs.config }}
+        RECORD: ${{ inputs.record }}
+        IS_DEFAULT_PUSH: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+      run: |
+        # A broken config is reported by the gate step; here it only means "nothing to cache".
+        store=$(python -c 'import sys; from pathlib import Path; from steadygate import config; print(config.load(Path(sys.argv[1])).store.resolve())' "$CONFIG" 2>/dev/null || true)
+        echo "path=$store" >> "$GITHUB_OUTPUT"
+        case "$RECORD" in
+          auto) record=$IS_DEFAULT_PUSH ;;
+          true|false) record=$RECORD ;;
+          *) echo "::error::record must be auto, true or false (got '$RECORD')"; exit 3 ;;
+        esac
+        echo "record=$record" >> "$GITHUB_OUTPUT"
+
+    - name: Restore history
+      if: inputs.history-cache == 'true' && steps.store.outputs.path != ''
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: ${{ inputs.cache-key }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: ${{ inputs.cache-key }}-
+
+    - name: Run the gate
+      id: gate
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        RESULTS: ${{ inputs.results }}
+        CONFIG: ${{ inputs.config }}
+        FORMAT: ${{ inputs.format }}
+        RECORD: ${{ steps.store.outputs.record }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        report="$RUNNER_TEMP/steadygate-report-$GITHUB_RUN_ID-$RANDOM.md"
+        args=(run "$RESULTS" --config "$CONFIG" --markdown "$report")
+        [ -n "$FORMAT" ] && args+=(--format "$FORMAT")
+        [ "$RECORD" = "true" ] && args+=(--record)
+        set +e
+        steadygate "${args[@]}"
+        code=$?
+        set -e
+        if [ ! -s "$report" ]; then
+          printf '### 🛑 Steadygate: CONFIG ERROR\n\nThe gate could not run; see the job log.\n' > "$report"
+        fi
+        printf '\n<sub>[Workflow run](%s)</sub>\n' "$RUN_URL" >> "$report"
+        cat "$report" >> "$GITHUB_STEP_SUMMARY"
+        case $code in
+          0) verdict=pass ;; 1) verdict=regression ;; 2) verdict=inconclusive ;; *) verdict=config-error ;;
+        esac
+        {
+          echo "exit-code=$code"
+          echo "verdict=$verdict"
+          echo "report=$report"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Save history
+      if: >-
+        inputs.history-cache == 'true' && steps.store.outputs.path != ''
+        && steps.store.outputs.record == 'true' && steps.gate.outputs.verdict == 'pass'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: ${{ inputs.cache-key }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+    - name: Comment on the pull request
+      if: inputs.comment == 'true' && github.event.pull_request.number
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        PR: ${{ github.event.pull_request.number }}
+        REPORT: ${{ steps.gate.outputs.report }}
+        MARKER: "<!-- steadygate:${{ inputs.cache-key }} -->"
+      run: |
+        body=$(printf '%s\n%s' "$MARKER" "$(cat "$REPORT")")
+        existing=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+          --jq '.[] | select(.body | startswith(env.MARKER)) | .id' 2>/dev/null | head -n1) || true
+        if [ -n "$existing" ]; then
+          gh api -X PATCH "repos/$REPO/issues/comments/$existing" -f body="$body" >/dev/null \
+            || echo "::warning::Steadygate could not update the PR comment (does the token have pull-requests: write?)"
+        else
+          gh api -X POST "repos/$REPO/issues/$PR/comments" -f body="$body" >/dev/null \
+            || echo "::warning::Steadygate could not comment on the PR (forks get a read-only token; the report is in the job summary)"
+        fi
+
+    - name: Set the exit code
+      shell: bash
+      env:
+        CODE: ${{ steps.gate.outputs.exit-code }}
+      run: exit "$CODE"
