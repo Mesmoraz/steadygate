@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from installer.install import InstallResult
 
 _TOLERANCE_MESSAGE = "Enter a fraction between 0 and 1, e.g. 0.05 for 5%."
+_INSTALL_DIR = "Enter a full folder path."
 _NOT_GIT = "This folder isn't a git repository. The files will still be written."
 
 
@@ -80,8 +81,17 @@ class WizardState:
         self.tolerance_text = _tolerance_text(defaults.tolerance)
         self.eval_command = defaults.eval_command
 
+    def set_install_dir(self, text: str) -> None:
+        """Store the typed folder, expanding ``~``. Empty text is kept as a relative path."""
+        raw = text.strip()
+        self.install_dir = Path(raw).expanduser() if raw else Path()
+
     def errors(self) -> dict[str, str]:
         found: dict[str, str] = {}
+        if self.page is Page.LOCATION:
+            if not self.install_dir.expanduser().is_absolute():
+                found["install_dir"] = _INSTALL_DIR
+            return found
         if self.page is not Page.PROJECT or not self.setup_project:
             return found
         if self.repo is None:

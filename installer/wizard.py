@@ -187,8 +187,9 @@ class _App:
         self.title("Install location")
         row = ttk.Frame(self.body)
         row.pack(fill="x")
-        folder = self.text_var(str(s.install_dir), lambda v: setattr(s, "install_dir", Path(v)))
+        folder = self.text_var(str(s.install_dir), s.set_install_dir)
         ttk.Entry(row, textvariable=folder).pack(side="left", fill="x", expand=True)
+        folder_error = ttk.Label(self.body, text="", foreground=_RED)
 
         def change() -> None:
             chosen = filedialog.askdirectory(initialdir=str(s.install_dir), parent=self.root)
@@ -196,6 +197,7 @@ class _App:
                 folder.set(str(Path(chosen)))
 
         ttk.Button(row, text="Change…", command=change).pack(side="left", padx=(8, 0))
+        folder_error.pack(anchor="w")
         on_path = tk.BooleanVar(master=self.root, value=s.add_to_path)
         ttk.Checkbutton(
             self.body,
@@ -207,6 +209,8 @@ class _App:
         button = ttk.Button(self.body, text="Install")
 
         def install() -> None:
+            if s.errors():
+                return
             registry = WinRegistry() if self.os_name == "windows" else None
             try:
                 done = run_install(
@@ -230,6 +234,14 @@ class _App:
 
         button.configure(command=install)
         button.pack(anchor="w")
+
+        def refresh() -> None:
+            message = s.errors().get("install_dir", "")
+            folder_error.configure(text=message)
+            button.state(["disabled"] if message else ["!disabled"])
+
+        self.refresh = refresh
+        refresh()
         result.pack(anchor="w", pady=12)
         if s.installed is not None:
             result.configure(text=f"Installed {s.installed.binary}")

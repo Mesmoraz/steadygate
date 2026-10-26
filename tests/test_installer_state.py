@@ -8,7 +8,7 @@ from installer.state import Page, WizardState, parse_tolerance
 
 
 def state(**kw: object) -> WizardState:
-    return WizardState(install_dir=Path("/x"), **kw)  # type: ignore[arg-type]
+    return WizardState(install_dir=Path.home() / "x", **kw)  # type: ignore[arg-type]
 
 
 def test_page_order_and_install_gate() -> None:
@@ -88,3 +88,34 @@ def test_next_stops_at_done_and_back_stops_at_welcome() -> None:
     s = state()
     s.back()
     assert s.page is Page.WELCOME
+
+
+def _at_location(s: WizardState) -> WizardState:
+    s.page = Page.LOCATION
+    return s
+
+
+@pytest.mark.parametrize("text", ["", "   ", "foo", "foo/bar"])
+def test_relative_or_empty_install_dir_is_an_error(text: str) -> None:
+    s = _at_location(state())
+    s.set_install_dir(text)
+    assert "install_dir" in s.errors()
+    s.installed = object()  # type: ignore[assignment]
+    assert not s.can_go_next()
+
+
+def test_home_relative_install_dir_is_expanded_and_accepted() -> None:
+    s = _at_location(state())
+    s.set_install_dir("~/bin")
+    assert s.install_dir == Path.home() / "bin"
+    assert s.errors() == {}
+
+
+def test_absolute_install_dir_has_no_error(tmp_path: Path) -> None:
+    s = _at_location(state())
+    s.set_install_dir(str(tmp_path))
+    assert s.install_dir == tmp_path
+    assert s.errors() == {}
+    assert not s.can_go_next()  # still needs a finished install
+    s.installed = object()  # type: ignore[assignment]
+    assert s.can_go_next()
