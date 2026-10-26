@@ -97,3 +97,11 @@ def test_site_has_install_and_audience(build: ModuleType) -> None:
     assert "Runs entirely in your browser. Nothing is sent anywhere." in html
     assert "install.js" in build.SITE_FILES
     assert html.index("install.js") < html.index("app.js")
+
+
+def test_install_soon_wraps_on_narrow_screens() -> None:
+    css = (REPO / "site" / "style.css").read_text(encoding="utf-8")
+    rule = re.search(r"\.install-soon \{([^}]*)\}", css)
+    assert rule and "max-width: 100%" in rule.group(1) and "box-sizing: border-box" in rule.group(1)
+    code = re.search(r"\.install-soon code,[^{]*\{([^}]*)\}", css)
+    assert code and "overflow-wrap: anywhere" in code.group(1)

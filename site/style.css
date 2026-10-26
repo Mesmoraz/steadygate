@@ -1130,6 +1130,9 @@ p {
 
 .install-soon {
   display: inline-block;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   padding: 0.65rem 1.1rem;
   border: 1px dashed var(--border);
   border-radius: 8px;
@@ -1203,4 +1206,11 @@ p {
   .trust-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.install-soon code,
+.install-note code,
+.download-note code {
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
