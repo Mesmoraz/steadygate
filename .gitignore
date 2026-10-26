@@ -13,3 +13,5 @@ htmlcov/
 .steadygate/
 *.jsonl.md
 _site/
+dist-installer/
+*.spec
