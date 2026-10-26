@@ -284,10 +284,10 @@ The installer puts one file on your machine and adds it to your PATH. To remove 
 
 - **Windows:** delete `%LOCALAPPDATA%\Programs\steadygate`. Then open *Edit environment
   variables for your account*, select `Path`, and remove that folder from the list.
-- **Mac:** delete `~/.local/bin/steadygate`. Then delete the line that ends
-  `# added by steadygate-setup` from `~/.zprofile` or `~/.bash_profile`.
-- **Linux:** delete `~/.local/bin/steadygate`. Then delete the line that ends
-  `# added by steadygate-setup` from `~/.profile`.
+- **Mac:** delete `~/.local/bin/steadygate`. Then delete the `# added by steadygate-setup`
+  line, and the `export PATH` line under it, from `~/.zprofile` and `~/.bash_profile`.
+- **Linux:** delete `~/.local/bin/steadygate`. Then delete the `# added by steadygate-setup`
+  line, and the `export PATH` line under it, from `~/.profile`, `~/.bashrc` and `~/.zshrc`.
 
 If you installed with pip, run `pip uninstall steadygate` instead.
 

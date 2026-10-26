@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import sys
+import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -50,7 +52,7 @@ class WinRegistry:
                 winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_SET_VALUE
             ) as key:
                 winreg.SetValueEx(key, "Path", 0, reg_type, value)
-            result = ctypes.c_ulong()
+            result = ctypes.c_size_t()
             ctypes.windll.user32.SendMessageTimeoutW(
                 0xFFFF,  # HWND_BROADCAST
                 0x001A,  # WM_SETTINGCHANGE
@@ -79,18 +81,33 @@ def default_install_dir(os_name: str, env: Mapping[str, str], home: Path) -> Pat
 
 
 def install_binary(src: Path, dest_dir: Path) -> Path:
+    """Copy ``src`` beside the target, then swap it in, so a reinstall never edits in place."""
     dest = dest_dir / ("steadygate.exe" if sys.platform == "win32" else "steadygate")
+    tmp: Path | None = None
     try:
         dest_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dest)
-        dest.chmod(0o755)
+        fd, name = tempfile.mkstemp(prefix=".steadygate-", suffix=".tmp", dir=dest_dir)
+        os.close(fd)
+        tmp = Path(name)
+        shutil.copy2(src, tmp)
+        tmp.chmod(0o755)
+        os.replace(tmp, dest)
+        tmp = None
     except PermissionError:
-        raise InstallError(_LOCKED) from None
+        if dest.exists():
+            raise InstallError(_LOCKED) from None
+        raise InstallError(
+            f"You don't have permission to write to {dest_dir}. "
+            "Choose a folder in your home directory."
+        ) from None
+    finally:
+        if tmp is not None:
+            tmp.unlink(missing_ok=True)
     return dest
 
 
 def _norm_win(entry: str) -> str:
-    return entry.strip().rstrip("\/").lower()
+    return entry.strip().rstrip("\\/").lower()
 
 
 def add_to_windows_path(directory: Path, reg: Registry) -> bool:
@@ -111,7 +128,11 @@ def _profile_files(home: Path, os_name: str) -> list[Path]:
         if (home / ".bash_profile").exists():
             files.append(home / ".bash_profile")
         return files
-    return [home / ".profile"]
+    # Login shells read ~/.profile; the non-login shells most terminals open read ~/.bashrc.
+    files = [home / ".profile", home / ".bashrc"]
+    if (home / ".zshrc").exists():
+        files.append(home / ".zshrc")
+    return files
 
 
 def _export_line(directory: Path, home: Path) -> str:
@@ -124,7 +145,7 @@ def _export_line(directory: Path, home: Path) -> str:
 
 
 def add_to_posix_path(directory: Path, home: Path, env_path: str, os_name: str) -> list[Path]:
-    """Append an export line to the login profile(s). Returns the files that changed."""
+    """Append an export line to the shell startup files. Returns the files that changed."""
     wanted = directory.resolve()
     for entry in env_path.split(":"):
         if entry and Path(entry).resolve() == wanted:
