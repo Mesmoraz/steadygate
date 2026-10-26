@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 from pathlib import Path
 from types import ModuleType
 
@@ -71,3 +72,9 @@ def test_assemble_writes_site(build: ModuleType, tmp_path: Path) -> None:
     data = json.loads((tmp_path / "out/data/scenarios.json").read_text())
     assert "support" in data["suites"]
     assert (tmp_path / "out/demo.py").exists()
+
+
+def test_site_uses_relative_urls():
+    for name in ("index.html", "app.js", "style.css"):
+        text = (REPO / "site" / name).read_text(encoding="utf-8")
+        assert not re.search(r"""(?:src|href|fetch\()\s*=?\s*["']/(?!/)""", text), name
