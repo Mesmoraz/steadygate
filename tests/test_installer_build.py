@@ -43,3 +43,17 @@ def test_asset_names() -> None:
         "macos": "steadygate-setup-macos.zip",
         "linux": "steadygate-setup-linux",
     }
+
+
+def test_release_workflow_triggers() -> None:
+    import yaml
+
+    path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "release.yml"
+    wf = yaml.safe_load(path.read_text(encoding="utf-8"))
+    on = wf[True]  # PyYAML reads the bare key "on" as a boolean
+    assert on["push"]["tags"] == ["v[0-9]+.[0-9]+.[0-9]+"]
+    assert sorted(on["pull_request"]["paths"]) == sorted(
+        ["installer/**", ".github/workflows/release.yml", "pyproject.toml", "src/**"]
+    )
+    assert "workflow_dispatch" in on
+    assert wf["jobs"]["release"]["if"] == "startsWith(github.ref, 'refs/tags/v')"

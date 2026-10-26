@@ -2,7 +2,16 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    # Full versions only, so pushing v1 or a pre-release tag by hand never publishes.
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  # workflow_dispatch only works once this file is on the default branch, so pull
+  # requests that touch the build run it too (the release job below stays tag-only).
+  pull_request:
+    paths:
+      - "installer/**"
+      - ".github/workflows/release.yml"
+      - "pyproject.toml"
+      - "src/**"
   workflow_dispatch:
 
 permissions:
