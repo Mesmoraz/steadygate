@@ -68,6 +68,15 @@ def test_workflow_uses_action_ref_and_results():
     assert any(s.get("run") == "npx promptfoo eval --repeat 5 --output results.json" for s in steps)
 
 
+@pytest.mark.parametrize("fmt", FORMATS)
+def test_eval_step_continues_on_error_so_the_gate_still_runs(fmt):
+    steps = yaml.safe_load(render_workflow(default_answers(fmt)))["jobs"]["gate"]["steps"]
+    gate_index = next(i for i, s in enumerate(steps) if "Mesmoraz/steadygate" in s.get("uses", ""))
+    eval_step = steps[gate_index - 1]
+    assert "run" in eval_step
+    assert eval_step.get("continue-on-error") is True
+
+
 def test_workflow_without_eval_command_has_placeholder_comment():
     text = render_workflow(default_answers("jsonl"))
     assert "# TODO: run your evals here" in text

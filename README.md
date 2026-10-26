@@ -213,6 +213,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npx promptfoo eval --repeat 5 --output results.json   # or pytest, Jest, ...
+        continue-on-error: true    # failing evals still reach the gate
       - uses: Mesmoraz/steadygate@main
         with:
           results: results.json

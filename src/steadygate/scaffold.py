@@ -98,6 +98,8 @@ def render_workflow(a: Answers) -> str:
         eval_step = f"      - run: {_scalar(a.eval_command)}\n"
     else:
         eval_step = '      # TODO: run your evals here\n      - run: echo "Run your evals here"\n'
+    # Failing evals exit non-zero; keep going so the gate still judges (and records) them.
+    eval_step += "        continue-on-error: true\n"
     return (
         "name: steadygate\n"
         "on:\n"
