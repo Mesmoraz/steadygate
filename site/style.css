@@ -1118,3 +1118,89 @@ p {
   color: var(--fg);
   font-weight: 600;
 }
+
+/* Install and audience */
+
+.install-note {
+  margin: 0.9rem 0 0;
+  max-width: 46rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.install-soon {
+  display: inline-block;
+  padding: 0.65rem 1.1rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.who {
+  padding-top: 2.5rem;
+}
+
+.not-for {
+  margin: 1rem 0 0;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.downloads {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+}
+
+.downloads li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+}
+
+.download-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.trust {
+  padding-top: 0.5rem;
+  padding-bottom: 2.5rem;
+}
+
+.trust-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.trust-list li {
+  position: relative;
+  padding: 0.65rem 0.9rem 0.65rem 2.4rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.trust-list li::before {
+  content: "\2713";
+  position: absolute;
+  left: 0.9rem;
+  color: var(--pass);
+  font-weight: 700;
+}
+
+@media (min-width: 760px) {
+  .trust-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

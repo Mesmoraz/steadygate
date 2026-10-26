@@ -25,13 +25,47 @@
         <li class="verdict-chip is-warn"><span aria-hidden="true">⚠️</span> <strong>Can't tell</strong><span class="chip-note">the test itself broke</span></li>
       </ul>
       <div class="cta">
-        <a class="btn btn-primary" href="#setup">See an example</a>
+        <a id="install-now" class="btn btn-primary" href="#install">Install now</a>
+        <a class="btn" href="#demo">Try the demo</a>
         <a class="btn" href="https://github.com/Mesmoraz/steadygate">View on GitHub</a>
       </div>
+      <p class="install-note" id="install-note"><a href="#install">Other platforms</a> and
+        <code>pip install</code> are in the install section. Windows may say "Windows protected
+        your PC": choose More info &rarr; Run anyway. On a Mac, right-click the app and choose
+        Open.</p>
     </div>
   </header>
 
   <main>
+    <section id="who" class="who wrap" aria-labelledby="who-title">
+      <h2 id="who-title">Who it's for</h2>
+      <div class="explain">
+        <div class="explain-card">
+          <h3>AI and LLM app teams</h3>
+          <p><strong>You're in the right place if&hellip;</strong> you run evals with promptfoo,
+            DeepEval or your own script, and a fixed threshold either blocks good releases or
+            lets bad ones through.</p>
+          <p><strong>What you get:</strong> a go/no-go that knows your normal variation.</p>
+        </div>
+        <div class="explain-card">
+          <h3>QA and release owners</h3>
+          <p><strong>You're in the right place if&hellip;</strong> you sign off releases, and now
+            you're asked to test AI features whose outputs vary.</p>
+          <p><strong>What you get:</strong> one clear verdict per run, an exit code your
+            pipeline can act on, and a report in the pull request.</p>
+        </div>
+        <div class="explain-card">
+          <h3>Teams with flaky tests</h3>
+          <p><strong>You're in the right place if&hellip;</strong> noisy end-to-end, performance
+            or game tests cry wolf.</p>
+          <p><strong>What you get:</strong> repeated-trial pass rates with confidence intervals,
+            so 7/10 isn't treated as a failure, and crashes are kept apart from real
+            regressions.</p>
+        </div>
+      </div>
+      <p class="not-for">If your tests give the same answer every time, a plain pass/fail is all you need.</p>
+    </section>
+
     <section id="setup" class="setup wrap" aria-labelledby="setup-title">
       <h2 id="setup-title">The example: a support chatbot</h2>
       <p class="section-lede">You're about to release an update to a customer-support chatbot.
@@ -134,8 +168,20 @@
       </ol>
     </section>
 
-    <section class="install wrap" aria-labelledby="install-title">
+    <section id="install" class="install wrap" aria-labelledby="install-title">
       <h2 id="install-title">Add it to your repo</h2>
+      <ul class="downloads" aria-label="Downloads">
+        <li><a class="btn" href="https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-windows.exe">Download for Windows</a></li>
+        <li><a class="btn" href="https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-macos.zip">Download for Mac</a></li>
+        <li><a class="btn" href="https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-linux">Download for Linux</a>
+          <span class="download-note">Run <code>chmod +x steadygate-setup-linux</code> first.</span></li>
+      </ul>
+      <p class="section-lede">Or install with pip, then set up a project:</p>
+      <div class="code-card">
+        <div class="code-head"><span>Terminal</span></div>
+<pre><code>pip install git+https://github.com/Mesmoraz/steadygate
+steadygate init</code></pre>
+      </div>
       <p class="section-lede">Run your evals as usual, then hand the results file to the
         Steadygate action. Runs on <code>main</code> build the history; pull requests get the
         verdict and a comment.</p>
@@ -168,6 +214,17 @@ jobs:
         <a href="https://github.com/Mesmoraz/steadygate#try-the-example">Run the example locally</a>
       </p>
     </section>
+
+    <section id="trust" class="trust wrap" aria-labelledby="trust-title">
+      <h2 id="trust-title">Why you can trust the answer</h2>
+      <ul class="trust-list">
+        <li>Errors can never make you pass.</li>
+        <li>A fixed exit-code contract (0 / 1 / 2 / 3).</li>
+        <li>Every answer on this page comes from the real engine running in your browser.</li>
+        <li>More than 90% test coverage, enforced in CI on Windows, Mac and Linux.</li>
+        <li>MIT licence.</li>
+      </ul>
+    </section>
   </main>
 
   <footer class="footer">
@@ -182,6 +239,7 @@ jobs:
   </footer>
 
   <script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js" defer></script>
+  <script src="install.js"></script>
   <script src="knobs.js"></script>
   <script src="markdown.js"></script>
   <script src="app.js"></script>

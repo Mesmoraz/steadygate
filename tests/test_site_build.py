@@ -78,3 +78,22 @@ def test_site_uses_relative_urls():
     for name in ("index.html", "app.js", "style.css"):
         text = (REPO / "site" / name).read_text(encoding="utf-8")
         assert not re.search(r"""(?:src|href|fetch\()\s*=?\s*["']/(?!/)""", text), name
+
+
+def test_site_has_install_and_audience(build: ModuleType) -> None:
+    html = (REPO / "site" / "index.html").read_text(encoding="utf-8")
+    for name in (
+        "steadygate-setup-windows.exe",
+        "steadygate-setup-macos.zip",
+        "steadygate-setup-linux",
+    ):
+        assert f"releases/latest/download/{name}" in html
+    assert 'id="who"' in html and 'id="install"' in html and 'id="trust"' in html
+    assert (
+        "If your tests give the same answer every time, a plain pass/fail is all you need." in html
+    )
+    assert "chmod +x steadygate-setup-linux" in html
+    assert "Your eval passed." in html
+    assert "Runs entirely in your browser. Nothing is sent anywhere." in html
+    assert "install.js" in build.SITE_FILES
+    assert html.index("install.js") < html.index("app.js")
