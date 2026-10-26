@@ -52,3 +52,53 @@ jobs:
           expect 0 candidate-noise.jsonl
           expect 1 candidate-regression.jsonl
           expect 2 candidate-broken.jsonl
+
+  # The GitHub Action itself, run from this checkout against the same example.
+  action:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Seed the example history
+        shell: bash
+        run: |
+          python -m pip install --quiet .
+          cd examples/basic
+          for i in 1 2 3; do steadygate record baseline-$i.jsonl --run-id base-$i; done
+      - id: noise
+        uses: ./
+        with:
+          results: candidate-noise.jsonl
+          working-directory: examples/basic
+          history-cache: "false"
+          record: "false"
+      - id: regression
+        uses: ./
+        continue-on-error: true
+        with:
+          results: candidate-regression.jsonl
+          working-directory: examples/basic
+          history-cache: "false"
+          comment: "false"
+      - id: broken
+        uses: ./
+        continue-on-error: true
+        with:
+          results: candidate-broken.jsonl
+          working-directory: examples/basic
+          history-cache: "false"
+          comment: "false"
+      - name: Outputs match the exit-code contract
+        shell: bash
+        env:
+          GOT: >-
+            ${{ steps.noise.outputs.verdict }}/${{ steps.noise.outputs.exit-code }}
+            ${{ steps.regression.outputs.verdict }}/${{ steps.regression.outputs.exit-code }}
+            ${{ steps.broken.outputs.verdict }}/${{ steps.broken.outputs.exit-code }}
+        run: |
+          [ "$GOT" = "pass/0 regression/1 inconclusive/2" ] || { echo "::error::got $GOT"; exit 1; }

@@ -1,0 +1,29 @@
+{
+  "created": 1761148800.0,
+  "duration": 4.2,
+  "exitcode": 1,
+  "root": "/repo",
+  "summary": {"passed": 2, "failed": 1, "error": 2, "skipped": 1, "xfailed": 1, "total": 7},
+  "tests": [
+    {"nodeid": "tests/test_agent.py::test_refund_policy", "outcome": "passed",
+     "setup": {"duration": 0.01, "outcome": "passed"},
+     "call": {"duration": 1.5, "outcome": "passed"},
+     "teardown": {"duration": 0.0, "outcome": "passed"},
+     "metadata": {"accuracy": 0.92, "tokens": 812, "judge": "gpt-4o", "cached": true}},
+    {"nodeid": "tests/test_agent.py::test_escalation", "outcome": "failed",
+     "setup": {"duration": 0.01, "outcome": "passed"},
+     "call": {"duration": 2.25, "outcome": "failed",
+              "crash": {"path": "/repo/tests/test_agent.py", "lineno": 12, "message": "AssertionError"}},
+     "metadata": {"accuracy": 0.4}},
+    {"nodeid": "tests/test_agent.py::test_judge_tone", "outcome": "error",
+     "setup": {"duration": 30.0, "outcome": "failed",
+               "crash": {"path": "/repo/conftest.py", "lineno": 3, "message": "TimeoutError: judge API timed out"}}},
+    {"nodeid": "tests/test_agent.py::test_teardown_crash", "outcome": "error",
+     "setup": {"duration": 0.0, "outcome": "passed"},
+     "call": {"duration": 0.1, "outcome": "passed"},
+     "teardown": {"duration": 0.0, "outcome": "failed", "longrepr": "  RuntimeError: db still open  "}},
+    {"nodeid": "tests/test_agent.py::test_spanish", "outcome": "skipped"},
+    {"nodeid": "tests/test_agent.py::test_known_bug", "outcome": "xfailed"},
+    {"nodeid": "tests/test_agent.py::test_lucky", "outcome": "xpassed"}
+  ]
+}

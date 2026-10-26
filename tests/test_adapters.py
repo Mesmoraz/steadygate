@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -70,3 +72,129 @@ def test_explicit_format_and_errors(tmp_path: Path, fixtures: Path) -> None:
         load_results(p, "csv")
     with pytest.raises(AdapterError, match="not found"):
         load_results(tmp_path / "missing.jsonl")
+
+
+def test_pytest_json_maps_outcomes_durations_and_metadata(fixtures: Path) -> None:
+    results = load_results(fixtures / "pytest-report.json")
+    by = {(r.case.split("::")[1], r.metric): r for r in results}
+
+    assert by["test_refund_policy", "passed"].value == 1.0
+    assert by["test_refund_policy", "duration_s"].value == 1.5
+    assert by["test_refund_policy", "accuracy"].value == 0.92
+    assert by["test_refund_policy", "tokens"].value == 812.0
+    assert ("test_refund_policy", "judge") not in by  # strings are not metrics
+    assert ("test_refund_policy", "cached") not in by  # nor are booleans
+    assert by["test_escalation", "passed"].value == 0.0
+    assert by["test_escalation", "accuracy"].value == 0.4  # failed tests keep their scores
+    assert by["test_lucky", "passed"].value == 1.0
+
+    tone = by["test_judge_tone", "passed"]
+    assert tone.status is Status.ERROR
+    assert tone.message == "TimeoutError: judge API timed out"
+    assert by["test_teardown_crash", "passed"].message == "RuntimeError: db still open"
+    assert by["test_spanish", "passed"].status is Status.SKIPPED
+    assert by["test_known_bug", "passed"].status is Status.SKIPPED
+
+
+@pytest.mark.parametrize(
+    ("body", "message"),
+    [
+        ('{"tests": [{"outcome": "passed"}]}', "nodeid"),
+        ('{"tests": [{"nodeid": "t", "outcome": "rerun"}]}', "unknown outcome 'rerun'"),
+    ],
+)
+def test_pytest_json_rejects_bad_entries(tmp_path: Path, body: str, message: str) -> None:
+    p = tmp_path / "r.json"
+    p.write_text(body, encoding="utf-8")
+    with pytest.raises(AdapterError, match=message):
+        load_results(p)
+
+
+def test_pytest_json_error_without_stage_details(tmp_path: Path) -> None:
+    p = tmp_path / "r.json"
+    p.write_text('{"tests": [{"nodeid": "t", "outcome": "error"}]}', encoding="utf-8")
+    (r,) = load_results(p)
+    assert (r.status, r.message) == (Status.ERROR, "")
+
+
+def test_pytest_json_needs_tests_list(tmp_path: Path) -> None:
+    p = tmp_path / "r.txt"
+    p.write_text('{"summary": {}}', encoding="utf-8")
+    with pytest.raises(AdapterError, match="'tests' list"):
+        load_results(p, "pytest-json")
+
+
+def test_promptfoo_maps_rows(fixtures: Path) -> None:
+    results = load_results(fixtures / "promptfoo.json")
+    refund = [r for r in results if r.case == "refund policy"]
+
+    assert [r.value for r in refund if r.metric == "passed"] == [1.0, 0.0]  # two repeats
+    assert [r.value for r in refund if r.metric == "score"] == [1.0, 0.25]
+    assert [r.value for r in refund if r.metric == "latency_ms"] == [812.0, 640.0]
+    assert [r.value for r in refund if r.metric == "cost"] == [0.0004]
+    assert [r.value for r in refund if r.metric == "helpfulness"] == [0.9]
+    assert not [r for r in refund if r.metric == "flag"]
+    assert all(r.status is Status.OK for r in refund)  # an assertion failure is not an error
+
+    (broken,) = [r for r in results if r.case == "test-1"]
+    assert broken.status is Status.ERROR
+    assert broken.message == "API error: 429 Too Many Requests"
+
+
+def _row(desc: str, idx: int, provider: str, prompt: str) -> dict[str, Any]:
+    return {
+        "testIdx": idx,
+        "testCase": {"description": desc},
+        "provider": {"id": provider},
+        "prompt": {"label": prompt},
+        "success": True,
+    }
+
+
+def test_promptfoo_case_names_split_by_provider_prompt_and_duplicate_descriptions(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        _row("greet", 0, "openai:a", "p1"),
+        _row("greet", 0, "openai:b", "p2"),
+        _row("same", 1, "openai:a", "p1"),
+        _row("same", 2, "openai:a", "p1"),
+    ]
+    p = tmp_path / "out.json"
+    p.write_text(json.dumps({"results": rows}), encoding="utf-8")  # older, flat layout
+    cases = [r.case for r in load_results(p) if r.metric == "passed"]
+    assert cases == [
+        "greet [openai:a | p1]",
+        "greet [openai:b | p2]",
+        "same #1 [openai:a | p1]",
+        "same #2 [openai:a | p1]",
+    ]
+
+
+def test_promptfoo_legacy_error_without_failure_reason(tmp_path: Path) -> None:
+    rows = [
+        {"testIdx": 0, "success": False, "error": "timeout", "provider": "x", "promptIdx": 0},
+        {"testIdx": 1, "success": False, "error": "wrong", "gradingResult": {"pass": False}},
+    ]
+    p = tmp_path / "out.json"
+    p.write_text(json.dumps({"results": {"results": rows}}), encoding="utf-8")
+    first, second = load_results(p)
+    assert first.status is Status.ERROR
+    assert (second.status, second.value) == (Status.OK, 0.0)
+
+
+def test_promptfoo_needs_results_list(tmp_path: Path) -> None:
+    p = tmp_path / "out.txt"
+    p.write_text('{"results": {"table": {}}}', encoding="utf-8")
+    with pytest.raises(AdapterError, match="'results' list"):
+        load_results(p, "promptfoo")
+
+
+def test_json_detection_sniffs_contents(tmp_path: Path, fixtures: Path) -> None:
+    assert detect_format(fixtures / "pytest-report.json") == "pytest-json"
+    assert detect_format(fixtures / "promptfoo.json") == "promptfoo"
+    for body, message in (("[]", "which tool"), ("{nope", "as JSON")):
+        p = tmp_path / "x.json"
+        p.write_text(body, encoding="utf-8")
+        with pytest.raises(AdapterError, match=message):
+            detect_format(p)
