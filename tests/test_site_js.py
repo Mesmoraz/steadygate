@@ -162,6 +162,6 @@ def test_markdown_escaping() -> None:
 
 
 def test_markdown_unescapes_pipes_in_list_items() -> None:
-    html = render("- `x` [accuracy] a \| b\n")
+    html = render(r"- `x` [accuracy] a \| b" + "\n")
     assert "a | b" in html
-    assert "\|" not in html
+    assert r"\|" not in html
