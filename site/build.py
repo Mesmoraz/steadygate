@@ -28,37 +28,38 @@ SITE_FILES = ["demo.py", "knobs.js", "markdown.js", "index.html", "style.css", "
 SCENARIOS: dict[str, dict[str, Any]] = {
     "support": {
         "dir": "basic",
-        "label": "Support agent",
+        "label": "Chatbot answers",
         "scenarios": [
             {
                 "id": "noise",
-                "label": "Normal noise",
-                "caption": "Accuracy is 2.2% below the baseline median, inside the 5% tolerance.",
+                "label": "A harmless tweak",
+                "caption": "Scored 88% against the usual 90%. That's normal wobble.",
                 "file": "candidate-noise.jsonl",
                 "expected": 0,
             },
             {
                 "id": "regression",
-                "label": "Real regression",
-                "caption": "Accuracy fell 17.8%. That's a real drop, not noise.",
+                "label": "A real drop",
+                "caption": "Scored 74% against the usual 90%. Something broke.",
                 "file": "candidate-regression.jsonl",
                 "expected": 1,
             },
             {
                 "id": "broken",
-                "label": "Judge timed out",
+                "label": "The grader crashed",
                 "caption": (
-                    "The score looks better, but one case's judge timed out, so it can't pass."
+                    "One question couldn't be graded. The score looks better (95%), "
+                    "but it can't be trusted."
                 ),
                 "file": "candidate-broken.jsonl",
                 "expected": 2,
             },
             {
                 "id": "missing",
-                "label": "Case never reported",
+                "label": "A test never ran",
                 "caption": (
-                    "One case crashed before writing any result. "
-                    "The average looks fine; the gate doesn't."
+                    "One question has no result at all. The score looks fine; Steadygate doesn't "
+                    "trust it."
                 ),
                 "file": "candidate-missing.jsonl",
                 "expected": 2,
@@ -67,21 +68,22 @@ SCENARIOS: dict[str, dict[str, Any]] = {
     },
     "trials": {
         "dir": "trials",
-        "label": "Repeated trials",
+        "label": "Agent tasks",
         "scenarios": [
             {
                 "id": "noise",
-                "label": "7/10 is noise",
+                "label": "7 out of 10: bad luck",
                 "caption": (
-                    "Against an 80% target, 7 passes out of 10 is within the confidence interval."
+                    "One task worked 7 times out of 10. With only 10 tries, an 80% task does "
+                    "that by chance."
                 ),
                 "file": "candidate-noise.jsonl",
                 "expected": 0,
             },
             {
                 "id": "broken",
-                "label": "3/10 is real",
-                "caption": "3 out of 10 is confidently below 80%, so the build fails.",
+                "label": "3 out of 10: really broken",
+                "caption": "One task worked only 3 times out of 10. That's not luck; it's broken.",
                 "file": "candidate-broken.jsonl",
                 "expected": 1,
             },

@@ -511,14 +511,12 @@ p {
 }
 
 .knob-name {
-  font-family: var(--mono);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .knob-value {
-  font-family: var(--mono);
   font-size: 0.85rem;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
@@ -526,8 +524,9 @@ p {
 
 .knob-toggles {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.3rem;
-  margin-left: auto;
+  margin-top: 0.1rem;
 }
 
 .toggle,
@@ -690,11 +689,11 @@ p {
 }
 
 .badge-exit {
+  flex-basis: 100%;
+  margin: 0;
   font-family: var(--mono);
-  font-size: 0.9rem;
-  padding: 0.15rem 0.5rem;
-  border: 1px solid currentColor;
-  border-radius: 999px;
+  font-size: 0.78rem;
+  color: var(--muted);
 }
 
 .badge-summary {
@@ -784,98 +783,6 @@ p {
   margin: 0.4rem 0 0;
   font-size: 0.85rem;
   color: var(--muted);
-}
-
-/* Rule table */
-
-.table-scroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.rules {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-
-.rules th,
-.rules td {
-  text-align: left;
-  vertical-align: top;
-  padding: 0.45rem 0.5rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.rules th {
-  color: var(--muted);
-  font-weight: 600;
-  font-size: 0.8rem;
-}
-
-.rules tr:last-child td {
-  border-bottom: 0;
-}
-
-.rules code {
-  overflow-wrap: normal;
-}
-
-.outcome {
-  white-space: nowrap;
-  font-weight: 600;
-}
-
-.outcome.is-pass,
-.outcome.is-fail,
-.outcome.is-warn {
-  background: none;
-}
-
-.outcome.is-muted {
-  color: var(--muted);
-}
-
-.detail {
-  color: var(--muted);
-}
-
-@media (max-width: 520px) {
-  /* Stack the rule table into cards so nothing scrolls sideways on a phone. */
-  .rules thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-  }
-
-  .rules,
-  .rules tbody,
-  .rules tr,
-  .rules td {
-    display: block;
-    width: 100%;
-  }
-
-  .rules tr {
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .rules tr:last-child {
-    border-bottom: 0;
-  }
-
-  .rules td {
-    border: 0;
-    padding: 0.1rem 0;
-  }
-
-  .rules td.req::before {
-    content: "Required: ";
-    color: var(--muted);
-  }
 }
 
 /* PR comment card, styled after a GitHub comment */
@@ -1047,6 +954,151 @@ p {
 
 .links {
   margin-top: 1rem;
+}
+
+/* Plain-language setup and checks */
+
+.setup {
+  padding-top: 2.5rem;
+  scroll-margin-top: 1rem;
+}
+
+.explain {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+@media (min-width: 760px) {
+  .explain {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.explain-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.explain-card h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.explain-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.suite-intro,
+.knobs-lede {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.pick-title {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.tech-toggle {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font: inherit;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tech-toggle[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.check-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.check {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+.check-mark {
+  border-radius: 6px;
+  padding: 0 0.2rem;
+  flex: 0 0 auto;
+  line-height: 1.4;
+}
+
+.check-body {
+  min-width: 0;
+}
+
+.check-q {
+  margin: 0;
+  font-weight: 600;
+}
+
+.check-opt {
+  margin-left: 0.4rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.check-a {
+  margin: 0.15rem 0 0;
+  color: var(--fg);
+  font-size: 0.92rem;
+}
+
+.check-tech {
+  display: none;
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.checks.show-tech .check-tech {
+  display: block;
+}
+
+.pr-wrap > summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.5rem 0;
+}
+
+.pr-wrap[open] > summary {
+  margin-bottom: 0.5rem;
 }
 
 /* Footer */

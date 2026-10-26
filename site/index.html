@@ -16,24 +16,78 @@
     <div class="wrap">
       <p class="eyebrow">Steadygate</p>
       <h1><span>Your eval passed.</span> <span>Your agent got worse.</span></h1>
-      <p class="lede">Steadygate is a statistical release gate for LLM evals and flaky tests.
-        It compares each run against your own history, so noise passes, a real drop fails,
-        and a crashed case is never a silent green.</p>
-      <ul class="verdicts" aria-label="The three verdicts">
-        <li class="verdict-chip is-pass"><span aria-hidden="true">✅</span> <strong>PASS</strong> <span class="exit">exit 0</span><span class="chip-note">within normal noise</span></li>
-        <li class="verdict-chip is-fail"><span aria-hidden="true">❌</span> <strong>REGRESSION</strong> <span class="exit">exit 1</span><span class="chip-note">worse, not noise</span></li>
-        <li class="verdict-chip is-warn"><span aria-hidden="true">⚠️</span> <strong>INCONCLUSIVE</strong> <span class="exit">exit 2</span><span class="chip-note">errored or missing results</span></li>
+      <p class="lede">Before you release an AI feature, you test it. But AI answers vary from run
+        to run, so test scores wobble even when nothing is wrong. Steadygate compares each test
+        run with your own recent history and gives you one of three plain answers.</p>
+      <ul class="verdicts" aria-label="The three answers">
+        <li class="verdict-chip is-pass"><span aria-hidden="true">✅</span> <strong>Safe to ship</strong><span class="chip-note">scores are within normal wobble</span></li>
+        <li class="verdict-chip is-fail"><span aria-hidden="true">❌</span> <strong>Don't ship</strong><span class="chip-note">it really got worse</span></li>
+        <li class="verdict-chip is-warn"><span aria-hidden="true">⚠️</span> <strong>Can't tell</strong><span class="chip-note">the test itself broke</span></li>
       </ul>
       <div class="cta">
-        <a class="btn btn-primary" href="#demo">Try it</a>
+        <a class="btn btn-primary" href="#setup">See an example</a>
         <a class="btn" href="https://github.com/Mesmoraz/steadygate">View on GitHub</a>
       </div>
     </div>
   </header>
 
   <main>
+    <section id="setup" class="setup wrap" aria-labelledby="setup-title">
+      <h2 id="setup-title">The example: a support chatbot</h2>
+      <p class="section-lede">You're about to release an update to a customer-support chatbot.
+        Before every release, an automatic test asks it 5 real customer questions, such as
+        "Can I get a refund?" and "Where's my order?". Each question is asked 10 times, and an
+        AI grader marks every answer right or wrong. Your last 3 releases scored about
+        <strong>90%</strong>. Is the new version safe to ship?</p>
+      <div class="explain">
+        <div class="explain-card">
+          <h3>What's measured</h3>
+          <p>For each question, the <strong>score</strong> is the share of its 10 answers the
+            grader accepted: 9 right out of 10 is 90%. Response time is tracked too.</p>
+        </div>
+        <div class="explain-card">
+          <h3>Why scores wobble</h3>
+          <p>Ask the same chatbot the same questions twice and you get slightly different
+            answers, so the score moves a few points with nothing broken. A fixed rule like
+            "fail below 90%" would block healthy releases.</p>
+        </div>
+        <div class="explain-card">
+          <h3>What Steadygate does</h3>
+          <p>It compares the new score with your recent releases and only objects to a drop
+            bigger than the normal wobble. If part of the test crashed, it says
+            <strong>can't tell</strong> instead of pretending all is well.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="demo" class="demo" aria-labelledby="demo-title">
+      <div class="wrap">
+        <h2 id="demo-title">Try it</h2>
+        <p class="section-lede">Pick what happened in the new version, then see Steadygate's
+          answer and the checks behind it. Every answer comes from the real Steadygate engine.</p>
+        <div class="demo-grid">
+          <div class="demo-pick">
+            <div class="suite-tabs" id="suite-tabs" role="group" aria-label="Example"></div>
+            <p class="suite-intro" id="suite-intro"></p>
+            <h3 class="pick-title">What happened?</h3>
+            <div class="scenarios" id="scenarios" role="group" aria-label="What happened"></div>
+          </div>
+          <div class="demo-knobs">
+            <h3 class="knobs-title">Or try your own version</h3>
+            <p class="knobs-lede" id="knobs-lede"></p>
+            <p class="status-note" id="engine-status" role="status"></p>
+            <div class="knobs" id="knobs"></div>
+          </div>
+          <div class="demo-output" id="output">
+            <p class="loading">Loading the example…</p>
+          </div>
+        </div>
+        <p class="visually-hidden" id="verdict-live" aria-live="polite" aria-atomic="true"></p>
+      </div>
+    </section>
+
     <section class="how wrap" aria-labelledby="how-title">
-      <h2 id="how-title">How it works</h2>
+      <h2 id="how-title">How it works in your project</h2>
       <ol class="steps">
         <li class="step">
           <svg class="step-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
@@ -43,22 +97,9 @@
             <path d="M21 32h10" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/>
           </svg>
           <div>
-            <h3><span class="step-num">1</span> Your eval tool runs</h3>
-            <p>Keep promptfoo, pytest, JUnit or plain JSONL. Steadygate sits on top of the
-              framework you already use and reads its results file.</p>
-          </div>
-        </li>
-        <li class="step">
-          <svg class="step-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-            <rect x="6" y="8" width="36" height="32" rx="4" fill="none" stroke="currentColor" stroke-width="2.5"/>
-            <path d="M6 18h36M6 29h36M19 8v32" stroke="currentColor" stroke-width="2"/>
-            <circle cx="31" cy="34.5" r="2.6" fill="var(--warn)"/>
-            <circle cx="31" cy="23.5" r="2.6" fill="var(--pass)"/>
-          </svg>
-          <div>
-            <h3><span class="step-num">2</span> An adapter normalises results</h3>
-            <p>Every result becomes a <code>case · metric · value · status</code> row.
-              A crash or a judge timeout becomes <code>error</code>, not a missing number.</p>
+            <h3><span class="step-num">1</span> Run your tests as usual</h3>
+            <p>Keep the tool you already use: promptfoo, pytest, JUnit or a simple JSON file.
+              Steadygate reads its results file; it doesn't replace your tests.</p>
           </div>
         </li>
         <li class="step">
@@ -72,52 +113,9 @@
             <circle cx="37" cy="23" r="3.6" fill="none" stroke="var(--pass)" stroke-width="2.5"/>
           </svg>
           <div>
-            <h3><span class="step-num">3</span> History is the baseline</h3>
-            <p>Passing runs from <code>main</code> are recorded. Each new run is compared
-              against the median of recent runs, not a fixed number someone guessed once.</p>
-          </div>
-        </li>
-      </ol>
-    </section>
-
-    <section id="demo" class="demo" aria-labelledby="demo-title">
-      <div class="wrap">
-        <h2 id="demo-title">Try it</h2>
-        <p class="section-lede">Pick a run and see what the gate says. These are the repo's own
-          example files, gated by the real Steadygate CLI.</p>
-        <div class="demo-grid">
-          <div class="demo-pick">
-            <div class="suite-tabs" id="suite-tabs" role="group" aria-label="Example suite"></div>
-            <div class="scenarios" id="scenarios" role="group" aria-label="Scenario"></div>
-          </div>
-          <div class="demo-knobs">
-            <h3 class="knobs-title">Change this run</h3>
-            <p class="status-note" id="engine-status" role="status"></p>
-            <div class="knobs" id="knobs"></div>
-          </div>
-          <div class="demo-output" id="output">
-            <p class="loading">Loading scenarios…</p>
-          </div>
-        </div>
-        <p class="visually-hidden" id="verdict-live" aria-live="polite" aria-atomic="true"></p>
-      </div>
-    </section>
-
-    <section class="how wrap" aria-labelledby="how-title-2">
-      <h2 id="how-title-2" class="visually-hidden">How it works, continued</h2>
-      <ol class="steps" start="4">
-        <li class="step">
-          <svg class="step-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-            <rect x="8" y="6" width="32" height="36" rx="4" fill="none" stroke="currentColor" stroke-width="2.5"/>
-            <path d="M14 16l3 3 5-6M14 27l3 3 5-6" fill="none" stroke="var(--pass)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M14 36h4" stroke="var(--fail)" stroke-width="2.5" stroke-linecap="round"/>
-            <path d="M26 16h8M26 27h8M26 36h8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-          </svg>
-          <div>
-            <h3><span class="step-num">4</span> Rules decide</h3>
-            <p><code>relative_delta</code>, <code>absolute</code>, <code>mad_outlier</code> and
-              <code>pass_rate</code> check the run. Required rules block the release;
-              optional ones are reported without changing the verdict.</p>
+            <h3><span class="step-num">2</span> Compare with your history</h3>
+            <p>Every passing run on your main branch is remembered. A new run is compared
+              with the middle value of recent runs, not a number someone guessed once.</p>
           </div>
         </li>
         <li class="step">
@@ -128,9 +126,9 @@
             <circle cx="33" cy="21.5" r="3" fill="var(--warn)"/>
           </svg>
           <div>
-            <h3><span class="step-num">5</span> One verdict, one exit code, one PR comment</h3>
-            <p>PASS, REGRESSION or INCONCLUSIVE, as exit code 0, 1 or 2, so CI can act on it.
-              The same report lands on the pull request as a comment.</p>
+            <h3><span class="step-num">3</span> Get one clear answer</h3>
+            <p>Safe to ship, don't ship, or can't tell. Your CI gets an exit code (0, 1 or 2)
+              to act on, and the pull request gets the report as a comment.</p>
           </div>
         </li>
       </ol>
