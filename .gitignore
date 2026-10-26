@@ -12,3 +12,4 @@ htmlcov/
 .ruff_cache/
 .steadygate/
 *.jsonl.md
+_site/
