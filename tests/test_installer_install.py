@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -105,6 +106,10 @@ def test_posix_macos_also_updates_existing_bash_profile(tmp_path: Path) -> None:
     assert (tmp_path / ".bash_profile").read_text().startswith("# mine\n")
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="POSIX PATH entries split on ':', which a Windows drive letter breaks",
+)
 def test_posix_already_on_path_is_noop(tmp_path: Path) -> None:
     d = tmp_path / ".local/bin"
     assert add_to_posix_path(d, tmp_path, f"/usr/bin:{d}", "linux") == []
