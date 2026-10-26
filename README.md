@@ -2,6 +2,8 @@
 
 **A statistical release gate for non-deterministic systems: LLM agents, evals, and flaky test suites.**
 
+**[▶ Try the live demo](https://mesmoraz.github.io/steadygate/)**, which runs in your browser with nothing to install.
+
 Your eval passed, and your agent still got worse. Gates like "fail if score < 0.80" break down
 when the model, the LLM judge, and the set of cases that ran all vary between runs. They raise
 false alarms on noise, and they pass quietly when half the suite crashed.
@@ -74,6 +76,8 @@ cd ../trials                                # each case run 10 times
 steadygate run candidate-noise.jsonl        # PASS: 7/10 against an 80% target is noise
 steadygate run candidate-broken.jsonl       # REGRESSION: 3/10 is confidently below 80%
 ```
+
+Or try these scenarios in the [live demo](https://mesmoraz.github.io/steadygate/), where you can move the scores yourself.
 
 ## Companion: run it next to your app
 
@@ -253,6 +257,12 @@ skipped results count as reported, because the rules already handle them.
 python -m venv .venv && . .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev,companion]"
 pytest && ruff check . && mypy
+```
+
+To build the demo site locally:
+
+```bash
+python -m build --wheel --outdir dist && python site/build.py --out _site --wheel dist/*.whl
 ```
 
 Local-first: Steadygate makes no network calls and collects no telemetry. The companion

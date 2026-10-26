@@ -57,4 +57,4 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 
 [tool.mypy]
 strict = true
-files = ["src"]
+files = ["src", "site"]
