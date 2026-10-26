@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from steadygate import __version__, config, gate, report
+from steadygate import __version__, config, gate, report, scaffold
 from steadygate.adapters import ADAPTERS, AdapterError, load_results
 from steadygate.models import Verdict
 from steadygate.store import Store
@@ -69,6 +69,15 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="URL",
         help="let a web page at this origin call the API (repeatable)",
     )
+
+    ini = sub.add_parser("init", help="write a starter steadygate.yml and GitHub workflow")
+    ini.add_argument("--dir", type=Path, default=Path("."), help="project folder (default: .)")
+    ini.add_argument("--format", choices=scaffold.FORMATS, help="format of your results file")
+    ini.add_argument("--results", help="path to your results file")
+    ini.add_argument("--metric", help="metric to gate on")
+    ini.add_argument("--tolerance", type=float, help="allowed drop, e.g. 0.05 for 5%%")
+    ini.add_argument("--eval-command", help="command that runs your evals in CI")
+    ini.add_argument("--force", action="store_true", help="overwrite files that already exist")
     return parser
 
 
@@ -106,10 +115,61 @@ def _serve(args: argparse.Namespace) -> int:
     return 0
 
 
+_TOLERANCE_MSG = "tolerance must be between 0 and 1, e.g. 0.05 for 5%"
+
+
+def _ask(label: str, default: str) -> str:
+    shown = f" [{default}]" if default else ""
+    return input(f"{label}{shown}: ").strip() or default
+
+
+def _init(args: argparse.Namespace) -> int:
+    fmt = args.format
+    interactive = fmt is None and sys.stdin.isatty()
+    if fmt is None:
+        if not interactive:
+            return _config_error("--format is required when not run in a terminal")
+        fmt = _ask(f"Results format ({', '.join(scaffold.FORMATS)})", "")
+        if fmt not in scaffold.FORMATS:
+            return _config_error(f"format must be one of: {', '.join(scaffold.FORMATS)}")
+    base = scaffold.default_answers(fmt)
+    results = args.results or base.results_path
+    metric = args.metric or base.metric
+    tolerance = base.tolerance if args.tolerance is None else args.tolerance
+    command = base.eval_command if args.eval_command is None else args.eval_command
+    if interactive:
+        results = _ask("Results file", results)
+        metric = _ask("Metric", metric)
+        raw = _ask("Tolerance (0.05 = 5%)", f"{tolerance:g}")
+        try:
+            tolerance = float(raw)
+        except ValueError:
+            return _config_error(_TOLERANCE_MSG)
+        command = _ask("Command that runs your evals (optional)", command)
+    if not 0 < tolerance < 1:
+        return _config_error(_TOLERANCE_MSG)
+    answers = scaffold.Answers(fmt, results, metric, tolerance, command)
+    planned = scaffold.plan_files(args.dir, answers)
+    overwrite = {f.path for f in planned if f.exists} if args.force else set()
+    written = set(scaffold.write_files(planned, overwrite))
+    for item in planned:
+        if item.path in written:
+            print(f"wrote {item.path}")
+        else:
+            print(f"kept existing {item.path} (use --force to replace)")
+    print()
+    print("Next steps:")
+    print(f"  git add {scaffold.CONFIG_PATH} {scaffold.WORKFLOW_PATH.as_posix()}")
+    print("  git commit, then push to main to start building history")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "serve":
         return _serve(args)
+    if args.command == "init":
+        return _init(args)
     run_id: str = args.run_id or _default_run_id()
 
     try:
