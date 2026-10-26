@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from steadygate.scaffold import (
     Answers,
@@ -13,6 +14,9 @@ from steadygate.scaffold import (
     default_answers,
     plan_files,
 )
+
+if TYPE_CHECKING:
+    from installer.install import InstallResult
 
 _TOLERANCE_MESSAGE = "Enter a fraction between 0 and 1, e.g. 0.05 for 5%."
 _NOT_GIT = "This folder isn't a git repository. The files will still be written."
@@ -49,8 +53,8 @@ class WizardState:
     install_dir: Path
     page: Page = Page.WELCOME
     add_to_path: bool = True
-    # Task 4 tightens this to ``InstallResult | None``.
-    installed: object | None = None
+    # Set once the binary has been copied; gates leaving the location page.
+    installed: InstallResult | None = None
     setup_project: bool = False
     repo: Path | None = None
     format: Format = "promptfoo"
