@@ -47,3 +47,17 @@ def test_persists_and_creates_parent_dirs(tmp_path: Path) -> None:
         s.record("run1", [r("a", "acc", 1.0)])
     with Store(path) as s:
         assert s.run_count() == 1
+
+
+def test_recent_cases_are_per_run_newest_first(store: Store) -> None:
+    store.record("r1", [r("a", "acc", 1.0), r("b", "acc", 1.0)])
+    store.record("r2", [r("a", "acc", 1.0), r("c", "lat", 5.0), r("d", "acc", None, Status.ERROR)])
+    store.record("r3", [r("b", "acc", 1.0)])
+    assert store.recent_cases(window=2) == [{"b"}, {"a", "c"}]
+    assert store.recent_cases(window=10, exclude_run="r3") == [{"a", "c"}, {"a", "b"}]
+
+
+def test_recent_cases_keeps_runs_with_no_usable_results(store: Store) -> None:
+    store.record("r1", [r("a", "acc", 1.0)])
+    store.record("r2", [r("a", "acc", None, Status.ERROR)])
+    assert store.recent_cases(window=10) == [set(), {"a"}]

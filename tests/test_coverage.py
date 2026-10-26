@@ -107,3 +107,65 @@ def test_manifest_from_file(tmp_path: Path) -> None:
 def test_bad_manifest(tmp_path: Path, value: object, message: str) -> None:
     with pytest.raises(config.ConfigError, match=message):
         cfg(value, base=tmp_path)
+
+
+# --- no manifest: infer the expected cases from the baseline ---------------------------
+
+BASELINE = [{"a", "b", "c"}, {"a", "b", "c"}, {"a", "b", "c", "d"}]
+
+
+def run_with(cases: list[set[str]], results: list[Result]) -> gate.GateResult:
+    return gate.evaluate(cfg(), results, FakeHistory([], cases), run_id="cand")
+
+
+def test_case_every_baseline_run_reported_is_inferred() -> None:
+    result = run_with(BASELINE, full("a") + full("b"))
+    assert result.verdict is Verdict.INCONCLUSIVE
+    cov = result.outcomes[0]
+    assert cov.rule == "coverage" and cov.required and cov.outcome is Outcome.INCONCLUSIVE
+    assert "1/3 baseline case(s) missing: c" in cov.detail
+
+
+def test_inferred_cases_all_present_passes_and_says_so() -> None:
+    # d showed up in only one baseline run, so its absence proves nothing.
+    result = run_with(BASELINE, full("a") + full("b") + full("c"))
+    assert result.verdict is Verdict.PASS
+    cov = result.outcomes[0]
+    assert cov.outcome is Outcome.PASS
+    assert cov.detail == "all 3/3 case(s) from the last 3 baseline run(s) reported"
+
+
+def test_inferred_cases_ignore_metrics() -> None:
+    # The inferred check is per case; a case that reports anything counts as present.
+    results = [*full("a"), *full("b"), Result("c", "latency", 100.0)]
+    assert run_with(BASELINE, results).outcomes[0].outcome is Outcome.PASS
+
+
+def test_errored_case_counts_as_reported_when_inferred() -> None:
+    results = [*full("a"), *full("b"), Result("c", "acc", None, Status.ERROR, "timeout")]
+    out = run_with(BASELINE, results)
+    assert out.outcomes[0].outcome is Outcome.PASS
+    assert out.verdict is Verdict.INCONCLUSIVE  # from the rule, not from coverage
+
+
+def test_no_inference_before_min_history() -> None:
+    result = run_with(BASELINE[:2], full("a"))
+    assert [o.rule for o in result.outcomes] == ["absolute:acc", "absolute:latency"]
+
+
+def test_no_inference_when_baseline_runs_share_no_case() -> None:
+    result = run_with([{"a"}, {"b"}, {"c"}], full("z"))
+    assert [o.rule for o in result.outcomes] == ["absolute:acc", "absolute:latency"]
+
+
+def test_inference_reads_the_window_and_skips_the_candidate_run() -> None:
+    history = FakeHistory([], BASELINE)
+    gate.evaluate(cfg(), full("a"), history, run_id="cand")
+    assert history.case_calls == [(10, "cand")]
+
+
+def test_manifest_wins_over_inference() -> None:
+    history = FakeHistory([], BASELINE)
+    result = gate.evaluate(cfg(["a"]), full("a"), history)
+    assert result.verdict is Verdict.PASS
+    assert history.case_calls == []

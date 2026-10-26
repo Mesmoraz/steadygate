@@ -270,8 +270,13 @@ change the verdict.
 ### Expected cases
 
 A crashed test often writes no result at all, so it quietly drops out of the average and
-the run looks green. List the cases every run must report, and any that are missing make the
-run **INCONCLUSIVE**:
+the run looks green. Steadygate guards against this even with no setup: once the baseline has
+`min_history` runs, any case that **every** recent baseline run reported (within `window`) must
+appear again, or the run is **INCONCLUSIVE**. A case missing from even one baseline run isn't
+required, so a test you add or remove settles in on its own.
+
+To spell the list out instead, set `expected_cases`. It replaces the inferred list and works from
+the very first run:
 
 ```yaml
 expected_cases: [refund-policy, shipping-faq, escalation]   # or: expected_cases: cases.txt
@@ -279,7 +284,8 @@ expected_cases: [refund-policy, shipping-faq, escalation]   # or: expected_cases
 
 A file lists one case per line; blank lines and `#` comments are ignored. A case also
 counts as missing if it ran but dropped a metric that a required rule reads. Errored and
-skipped results count as reported, because the rules already handle them.
+skipped results count as reported, because the rules already handle them. (The inferred
+list only checks that each case reported something; it doesn't check metrics.)
 
 ## Uninstall
 
@@ -299,6 +305,7 @@ If you installed with pip, run `pip uninstall steadygate` instead.
 - [x] JSONL + JUnit adapters, SQLite baseline store, `absolute` + `relative_delta`, exit-code contract
 - [x] `mad_outlier` and `pass_rate` (Wilson interval over repeated trials)
 - [x] Expected-case manifest: missing cases become INCONCLUSIVE
+- [x] Without a manifest, cases every baseline run reported are expected by default
 - [x] promptfoo and pytest-json-report adapters, PR-comment GitHub Action
 - [x] Playwright JSON reporter adapter
 - [ ] DeepEval adapter

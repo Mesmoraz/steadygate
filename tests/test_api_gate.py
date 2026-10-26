@@ -34,7 +34,8 @@ def test_full_flow_pass_then_regression(client: TestClient) -> None:
     assert (good["verdict"], good["code"]) == ("pass", 0)
     bad = client.post(f"/sessions/{_session(client, [80.0])}/gate").json()
     assert (bad["verdict"], bad["code"]) == ("regression", 1)
-    assert bad["rules"][0]["outcome"] == "fail"
+    assert bad["rules"][0]["rule"] == "coverage"  # inferred from the baseline
+    assert bad["rules"][1]["outcome"] == "fail"
 
 
 def test_record_returns_counts(client: TestClient) -> None:
