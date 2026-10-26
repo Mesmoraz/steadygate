@@ -23,13 +23,50 @@ is reported as *inconclusive*, never as a silent green.
 
 > Status: pre-alpha (v0.0.1). The API and config format will change.
 
+## Who it's for
+
+- **AI and LLM app teams.** You run evals with promptfoo, DeepEval or your own script, and a
+  fixed threshold either blocks good releases or lets bad ones through. You get a go/no-go
+  that knows your normal variation.
+- **QA and release owners.** You sign off releases, and now you're asked to test AI features
+  whose outputs vary. You get one clear verdict per run, an exit code your pipeline can act
+  on, and a report in the pull request.
+- **Teams with flaky tests.** Your noisy end-to-end, performance or game tests cry wolf. You
+  get repeated-trial pass rates with confidence intervals, so 7/10 isn't treated as a
+  failure, and crashes are kept apart from real regressions.
+
+If your tests give the same answer every time, a plain pass/fail is all you need.
+
 ## Quick start
+
+Download the installer for your system:
+
+- [Windows](https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-windows.exe)
+- [Mac](https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-macos.zip)
+- [Linux](https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-linux)
+  (run `chmod +x steadygate-setup-linux` first)
+
+The builds are not signed yet. Windows may say "Windows protected your PC": choose
+More info, then Run anyway. On a Mac, right-click the app and choose Open.
+
+Then, in your project folder, set it up:
+
+```bash
+steadygate init
+```
+
+`steadygate init` writes a `steadygate.yml` and a GitHub workflow for you. Use `--dir` to pick
+the folder, `--format` (`promptfoo`, `pytest-json`, `junit` or `jsonl`), `--results`,
+`--metric`, `--tolerance` and `--eval-command` to fill in your details, and `--force` to
+overwrite files that already exist.
+
+Or install with pip:
 
 ```bash
 pip install git+https://github.com/Mesmoraz/steadygate
 ```
 
-Write a `steadygate.yml`:
+To write the config by hand, make a `steadygate.yml`:
 
 ```yaml
 store: .steadygate/history.db
@@ -239,6 +276,19 @@ expected_cases: [refund-policy, shipping-faq, escalation]   # or: expected_cases
 A file lists one case per line; blank lines and `#` comments are ignored. A case also
 counts as missing if it ran but dropped a metric that a required rule reads. Errored and
 skipped results count as reported, because the rules already handle them.
+
+## Uninstall
+
+The installer puts one file on your machine and adds it to your PATH. To remove it:
+
+- **Windows:** delete `%LOCALAPPDATA%\Programs\steadygate`. Then open *Edit environment
+  variables for your account*, select `Path`, and remove that folder from the list.
+- **Mac:** delete `~/.local/bin/steadygate`. Then delete the line that ends
+  `# added by steadygate-setup` from `~/.zprofile` or `~/.bash_profile`.
+- **Linux:** delete `~/.local/bin/steadygate`. Then delete the line that ends
+  `# added by steadygate-setup` from `~/.profile`.
+
+If you installed with pip, run `pip uninstall steadygate` instead.
 
 ## Roadmap
 
