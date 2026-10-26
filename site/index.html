@@ -91,13 +91,15 @@
             <div class="scenarios" id="scenarios" role="group" aria-label="Scenario"></div>
           </div>
           <div class="demo-knobs">
+            <h3 class="knobs-title">Change this run</h3>
             <p class="status-note" id="engine-status" role="status"></p>
             <div class="knobs" id="knobs"></div>
           </div>
-          <div class="demo-output" id="output" aria-live="polite">
+          <div class="demo-output" id="output">
             <p class="loading">Loading scenarios…</p>
           </div>
         </div>
+        <p class="visually-hidden" id="verdict-live" aria-live="polite" aria-atomic="true"></p>
       </div>
     </section>
 
@@ -179,6 +181,7 @@ jobs:
     </div>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js" defer></script>
   <script src="knobs.js"></script>
   <script src="markdown.js"></script>
   <script src="app.js"></script>

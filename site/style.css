@@ -324,10 +324,11 @@ p {
   display: grid;
   gap: 1.25rem;
   grid-template-columns: minmax(0, 1fr);
+  /* On a phone the knobs sit right above the output, so moving one shows the verdict. */
   grid-template-areas:
     "pick"
-    "output"
-    "knobs";
+    "knobs"
+    "output";
 }
 
 .demo-pick {
@@ -424,19 +425,215 @@ p {
   margin-top: 0.15rem;
 }
 
-/* Reserved for the live knobs (stage 2). */
+/* Live knobs */
+
+.demo-knobs {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 0.85rem 1rem 1rem;
+}
+
+.knobs-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 0.35rem;
+}
+
 .knobs {
   min-height: 8rem;
 }
 
 .status-note {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
   color: var(--muted);
-  font-size: 0.875rem;
-  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  margin: 0 0 0.75rem;
 }
 
 .status-note:empty {
   display: none;
+}
+
+.status-note::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--muted);
+  transform: translateY(-0.05rem);
+}
+
+.status-note[data-state="loading"]::before {
+  background: var(--warn);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.status-note[data-state="ready"]::before {
+  background: var(--pass);
+}
+
+.status-note[data-state="ready"] {
+  color: var(--fg);
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-note[data-state="loading"]::before {
+    animation: none;
+  }
+}
+
+.knob-cases {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.knob-case {
+  min-width: 0;
+}
+
+.knob-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+
+.knob-name {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.knob-value {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.knob-toggles {
+  display: flex;
+  gap: 0.3rem;
+  margin-left: auto;
+}
+
+.toggle,
+.step-btn {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--fg);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toggle {
+  padding: 0.15rem 0.6rem;
+  min-height: 1.9rem;
+}
+
+.toggle:hover:not(:disabled),
+.step-btn:hover:not(:disabled):not([aria-disabled="true"]) {
+  border-color: var(--accent);
+}
+
+.toggle[aria-pressed="true"][data-toggle="crashed"] {
+  border-color: var(--fail);
+  background: var(--fail-bg);
+  color: var(--fail);
+}
+
+.toggle[aria-pressed="true"][data-toggle="dropped"] {
+  border-color: var(--warn);
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.toggle:disabled,
+.step-btn:disabled,
+.step-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.knob-case input[type="range"] {
+  display: block;
+  width: 100%;
+  margin: 0.25rem 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.knob-case input[type="range"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.knob-case.is-dropped .knob-name,
+.knob-case.is-dropped .knob-value {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.knob-latency {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.knob-hint {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.knob-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.step-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.stepper-value {
+  min-width: 6.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.stepper-value strong {
+  color: var(--fg);
+  font-size: 1rem;
 }
 
 .loading,
@@ -454,7 +651,7 @@ p {
 }
 
 .output-body.is-stale {
-  opacity: 0.45;
+  opacity: 0.5;
 }
 
 .engine-error {
