@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from steadygate.adapters import jsonl, junit, promptfoo, pytest_json
+from steadygate.adapters import jsonl, junit, playwright, promptfoo, pytest_json
 from steadygate.models import Result
 
 ADAPTERS = {
     "jsonl": jsonl.load,
     "junit": junit.load,
+    "playwright": playwright.load,
     "promptfoo": promptfoo.load,
     "pytest-json": pytest_json.load,
 }
@@ -21,7 +22,7 @@ class AdapterError(ValueError):
 
 
 def _sniff_json(path: Path) -> str:
-    """Tell pytest-json-report from promptfoo output by their top-level keys."""
+    """Tell pytest-json-report, promptfoo and Playwright output apart by their top-level keys."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
@@ -31,6 +32,8 @@ def _sniff_json(path: Path) -> str:
             return "pytest-json"
         if "results" in data:
             return "promptfoo"
+        if isinstance(data.get("suites"), list):
+            return "playwright"
     raise AdapterError(
         f"can't tell which tool wrote {path.name}; pass --format ({', '.join(ADAPTERS)})"
     )

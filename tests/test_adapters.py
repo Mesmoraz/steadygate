@@ -193,8 +193,76 @@ def test_promptfoo_needs_results_list(tmp_path: Path) -> None:
 def test_json_detection_sniffs_contents(tmp_path: Path, fixtures: Path) -> None:
     assert detect_format(fixtures / "pytest-report.json") == "pytest-json"
     assert detect_format(fixtures / "promptfoo.json") == "promptfoo"
+    assert detect_format(fixtures / "playwright.json") == "playwright"
     for body, message in (("[]", "which tool"), ("{nope", "as JSON")):
         p = tmp_path / "x.json"
         p.write_text(body, encoding="utf-8")
         with pytest.raises(AdapterError, match=message):
             detect_format(p)
+
+
+def test_playwright_maps_tests_retries_and_broken_runs(fixtures: Path) -> None:
+    results = load_results(fixtures / "playwright.json")
+    by = {(r.case, r.metric): r for r in results}
+    coupon = "checkout.spec.ts > cart > applies coupon"
+
+    assert by["checkout.spec.ts > loads the page [chromium]", "passed"].value == 1.0
+    assert by["checkout.spec.ts > loads the page [firefox]", "duration_s"].value == 2.1
+    assert by[f"{coupon} [chromium]", "passed"].value == 1.0  # flaky: passed on retry
+    assert by[f"{coupon} [chromium]", "retries"].value == 1.0
+    assert by[f"{coupon} [chromium]", "duration_s"].value == 0.8  # the final attempt
+    assert by[f"{coupon} [firefox]", "passed"].value == 0.0  # a timeout is a failure
+    assert by[f"{coupon} [firefox]", "passed"].status is Status.OK
+    assert by["checkout.spec.ts > cart > known bug [chromium]", "passed"].value == 1.0
+
+    interrupted = by["checkout.spec.ts > cart > pays with card [chromium]", "passed"]
+    never_ran = by["checkout.spec.ts > cart > pays with card [firefox]", "passed"]
+    assert interrupted.status is Status.ERROR and "interrupted" in interrupted.message
+    assert never_ran.status is Status.ERROR and "did not run" in never_ran.message
+    for project in ("chromium", "firefox"):
+        wrap = by[f"checkout.spec.ts > cart > gift wrap [{project}]", "passed"]
+        assert wrap.status is Status.SKIPPED
+
+    (setup,) = [r for r in results if r.case == "playwright run"]
+    assert (setup.status, setup.message) == (
+        Status.ERROR,
+        "Error: globalSetup: database not reachable",
+    )
+
+
+def test_playwright_single_project_has_no_suffix(tmp_path: Path) -> None:
+    report = {
+        "suites": [
+            {
+                "title": "a.spec.ts",
+                "specs": [
+                    {
+                        "title": "works",
+                        "tests": [
+                            {
+                                "projectName": "",
+                                "expectedStatus": "passed",
+                                "results": [{"status": "passed"}],
+                            },
+                            {
+                                "projectName": "",
+                                "expectedStatus": "passed",
+                                "results": [{"status": "failed"}],
+                            },
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+    p = tmp_path / "r.json"
+    p.write_text(json.dumps(report), encoding="utf-8")
+    passed = [(r.case, r.value) for r in load_results(p) if r.metric == "passed"]
+    assert passed == [("a.spec.ts > works", 1.0), ("a.spec.ts > works", 0.0)]  # --repeat-each
+
+
+def test_playwright_needs_suites_list(tmp_path: Path) -> None:
+    p = tmp_path / "r.txt"
+    p.write_text('{"config": {}}', encoding="utf-8")
+    with pytest.raises(AdapterError, match="'suites' list"):
+        load_results(p, "playwright")

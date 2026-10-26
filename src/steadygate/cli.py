@@ -27,7 +27,7 @@ def _add_common(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "results",
         type=Path,
-        help="results file (JUnit XML, JSONL, pytest-json-report or promptfoo JSON)",
+        help="results file (JUnit XML, JSONL, or pytest-json-report, promptfoo or Playwright JSON)",
     )
     p.add_argument("--format", choices=sorted(ADAPTERS), help="override format detection")
     p.add_argument(

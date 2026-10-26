@@ -8,14 +8,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, get_args
 
-Format = Literal["promptfoo", "pytest-json", "junit", "jsonl"]
+Format = Literal["promptfoo", "pytest-json", "playwright", "junit", "jsonl"]
 FORMATS: tuple[Format, ...] = get_args(Format)
 
 ACTION_REF = "v1"
 CONFIG_PATH = Path("steadygate.yml")
 WORKFLOW_PATH = Path(".github/workflows/steadygate.yml")
 
-_PASS_RATE_FORMATS = ("pytest-json", "junit")
+_PASS_RATE_FORMATS = ("pytest-json", "playwright", "junit")
 _PLAIN_YAML = re.compile(r"[A-Za-z0-9_./-]+")
 
 
@@ -47,6 +47,14 @@ def default_answers(format: Format) -> Answers:
         )
     if format == "pytest-json":
         return Answers(format, "report.json", "passed")
+    if format == "playwright":
+        return Answers(
+            format,
+            "results.json",
+            "passed",
+            0.05,
+            "npx playwright test --reporter=json > results.json",
+        )
     if format == "junit":
         return Answers(format, "junit.xml", "passed")
     return Answers(format, "results.jsonl", "accuracy")
