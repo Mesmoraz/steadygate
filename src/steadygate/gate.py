@@ -77,14 +77,46 @@ def baseline_coverage(results: list[Result], ctx: Context) -> RuleOutcome | None
     return _missing_outcome(missing, total, "baseline")
 
 
+def missing_history(
+    config: Config, outcomes: list[RuleOutcome], ctx: Context
+) -> RuleOutcome | None:
+    """INCONCLUSIVE when the baseline has no runs at all and the gate needs one.
+
+    For a run that should have a baseline (a pull request gated against main), an empty
+    history means it was lost, such as an expired CI cache. Rules that compare against it
+    would say "not gating yet" and pass, and without ``expected_cases`` nothing would
+    notice dropped cases. A gate whose required rules and case list stand on their own
+    doesn't need history, so it isn't held up.
+    """
+    needs_history = config.expected_cases is None or any(
+        o.required and o.outcome is Outcome.NO_BASELINE for o in outcomes
+    )
+    if not needs_history or ctx.history.recent_cases(ctx.window, exclude_run=ctx.run_id):
+        return None
+    return RuleOutcome(
+        "history",
+        "*",
+        True,
+        Outcome.INCONCLUSIVE,
+        "no baseline runs found, so there is nothing to compare against. Record runs on "
+        "your main branch first. (In GitHub Actions, the history cache is deleted after "
+        "7 days without use.)",
+    )
+
+
 def evaluate(
-    config: Config, results: list[Result], history: History, run_id: str | None = None
+    config: Config,
+    results: list[Result],
+    history: History,
+    run_id: str | None = None,
+    require_history: bool = False,
 ) -> GateResult:
     """Run every rule and decide.
 
     * Any **required** rule FAILs -> REGRESSION
     * else any **required** rule is INCONCLUSIVE (including missing expected cases, or,
-      without ``expected_cases``, a case every baseline run reported) -> INCONCLUSIVE
+      without ``expected_cases``, a case every baseline run reported; or, with
+      ``require_history``, a baseline with no runs that the gate needs) -> INCONCLUSIVE
     * else -> PASS
 
     Optional rules are reported but never change the verdict.
@@ -98,6 +130,9 @@ def evaluate(
     )
     if cov is not None:
         outcomes.insert(0, cov)
+    hist = missing_history(config, outcomes, ctx) if require_history else None
+    if hist is not None:
+        outcomes.insert(0, hist)
     required = [o for o in outcomes if o.required]
 
     if any(o.outcome is Outcome.FAIL for o in required):

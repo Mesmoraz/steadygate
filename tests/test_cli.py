@@ -60,6 +60,22 @@ def test_first_runs_pass_without_baseline(
     assert "NO_BASELINE" in capsys.readouterr().out
 
 
+def test_require_history_refuses_to_pass_on_an_empty_store(
+    project: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    res = write_results(project / "r.jsonl", [0.9, 0.9])
+    md = project / "report.md"
+    assert run(project, "run", str(res), "--require-history", "--markdown", str(md)) == 2
+    assert "[INCONCLUSIVE] history: no baseline runs" in capsys.readouterr().out
+    assert "`history`" in md.read_text(encoding="utf-8")
+
+
+def test_require_history_gates_normally_once_runs_exist(project: Path) -> None:
+    seed_baseline(project)
+    res = write_results(project / "r.jsonl", [0.9, 0.9])
+    assert run(project, "run", str(res), "--require-history") == 0
+
+
 def test_pass_regression_and_inconclusive(
     project: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

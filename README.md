@@ -227,6 +227,14 @@ run is gated against that history without changing it, and the report is posted 
 comment that is updated on each push. The history lives in the Actions cache, so there is
 nothing to host.
 
+GitHub deletes a cache that hasn't been used for 7 days. If the history is gone, a pull request
+has nothing to compare against, so it is **INCONCLUSIVE** rather than passing unchecked. Push
+to the default branch to start rebuilding it; until `min_history` runs are back, the report
+says "not gating yet". This also applies to the pull request that adds the workflow, before
+main has any history: merge it, or set `missing-history: pass` while you set up. A gate that
+needs no history, with an `expected_cases` list and only `absolute` and `pass_rate` required
+rules, is never held up.
+
 | Input | Default | |
 |---|---|---|
 | `results` | (required) | Results file to gate |
@@ -234,6 +242,7 @@ nothing to host.
 | `format` | detected | `jsonl`, `junit`, `pytest-json`, `promptfoo` or `playwright` |
 | `working-directory` | `.` | |
 | `record` | `auto` | `auto` records passing runs on default-branch pushes only; or `true` / `false` |
+| `missing-history` | `inconclusive` | What a run that doesn't record reports when there is no history: `inconclusive` or `pass` |
 | `history-cache` | `true` | Keep the history store in the Actions cache |
 | `cache-key` | `steadygate-history` | Use a different one for each gate in a repository |
 | `comment` | `true` | Post the report on pull requests |

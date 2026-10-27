@@ -49,6 +49,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--record", action="store_true", help="add this run to the baseline if it passes"
     )
+    run.add_argument(
+        "--require-history",
+        action="store_true",
+        help="INCONCLUSIVE instead of PASS when the baseline has no runs (e.g. on pull requests)",
+    )
     run.add_argument("--markdown", type=Path, help="also write a markdown report (for PR comments)")
     run.add_argument("--json", action="store_true", help="print a JSON report instead of text")
 
@@ -184,7 +189,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"steadygate: recorded {n} result(s) as run {run_id} ({store.run_count()} runs)")
             return 0
 
-        outcome = gate.evaluate(cfg, results, store, run_id=run_id)
+        outcome = gate.evaluate(
+            cfg, results, store, run_id=run_id, require_history=args.require_history
+        )
         print(report.as_json(outcome) if args.json else report.text(outcome))
         if args.markdown:
             args.markdown.write_text(report.markdown(outcome), encoding="utf-8")
