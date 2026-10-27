@@ -1,0 +1,18 @@
+name: Bug
+description: Something crashed or didn't work as the README says.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version and OS
+      placeholder: steadygate 0.1.0 on Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran, what you expected, and what you got (with the full error).
+    validations:
+      required: true
