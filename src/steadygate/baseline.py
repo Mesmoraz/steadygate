@@ -42,6 +42,19 @@ class Suggestion:
         }
 
 
+# Name fragments of metrics where a smaller number is the better one.
+_LOWER_IS_BETTER = ("latency", "duration", "time", "cost", "error", "retries", "memory", "rss")
+_LOWER_SUFFIXES = ("_ms", "_s", "_sec", "_bytes", "_mb")
+
+
+def guess_direction(metric: str) -> str:
+    """A best guess from the metric's name; pass a direction explicitly when it's wrong."""
+    name = metric.lower()
+    if any(part in name for part in _LOWER_IS_BETTER) or name.endswith(_LOWER_SUFFIXES):
+        return "lower_is_better"
+    return "higher_is_better"
+
+
 def _ceil_to_hundredth(x: float) -> float:
     # The epsilon keeps an exact 0.05 from rounding up to 0.06 through float error.
     return math.ceil(x * 100 - 1e-9) / 100

@@ -122,6 +122,30 @@ class Store:
                 for (run_id,) in runs
             ]
 
+    def metrics(self) -> list[str]:
+        """Every metric the history has values for, alphabetically."""
+        with self._lock:
+            rows = self._conn.execute("SELECT DISTINCT metric FROM results ORDER BY metric")
+            return [m for (m,) in rows]
+
+    def recent_runs(self, window: int) -> list[list[Result]]:
+        """The results of the most recent ``window`` runs, oldest run first."""
+        with self._lock:
+            runs = self._conn.execute(
+                "SELECT run_id FROM runs ORDER BY seq DESC LIMIT ?", (window,)
+            ).fetchall()
+            return [
+                [
+                    Result(case, metric, value)
+                    for case, metric, value in self._conn.execute(
+                        "SELECT case_id, metric, value FROM results"
+                        " WHERE run_id = ? ORDER BY rowid",
+                        (run_id,),
+                    )
+                ]
+                for (run_id,) in reversed(runs)
+            ]
+
     def run_count(self) -> int:
         with self._lock:
             (n,) = self._conn.execute("SELECT COUNT(*) FROM runs").fetchone()

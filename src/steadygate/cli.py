@@ -6,6 +6,7 @@ Exit codes: 0 PASS · 1 REGRESSION · 2 INCONCLUSIVE · 3 config/usage error
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import socket
 import sys
@@ -13,9 +14,11 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from steadygate import __version__, config, gate, report, scaffold
+import yaml
+
+from steadygate import __version__, baseline, config, flaky, gate, report, scaffold
 from steadygate.adapters import ADAPTERS, AdapterError, load_results
-from steadygate.models import Verdict
+from steadygate.models import Result, Verdict
 from steadygate.store import Store
 
 
@@ -74,6 +77,33 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="URL",
         help="let a web page at this origin call the API (repeatable)",
     )
+
+    flk = sub.add_parser("flaky", help="find cases that flip between passing and failing")
+    flk.add_argument(
+        "results", type=Path, nargs="*", help="results files, oldest first (repeated trials count)"
+    )
+    flk.add_argument("--format", choices=sorted(ADAPTERS), help="override format detection")
+    flk.add_argument("--metric", default="passed", help="pass/fail metric (default: passed)")
+    flk.add_argument(
+        "--history", action="store_true", help="also read the recorded runs in the baseline store"
+    )
+    flk.add_argument(
+        "-c", "--config", type=Path, default=Path(config.DEFAULT_CONFIG), help="config file"
+    )
+    flk.add_argument("--markdown", type=Path, help="also write a markdown report")
+    flk.add_argument("--json", action="store_true", help="print JSON instead of text")
+
+    sug = sub.add_parser("suggest", help="propose rules sized from your recorded history")
+    sug.add_argument(
+        "--metric", action="append", default=[], help="metric to size (default: all; repeatable)"
+    )
+    sug.add_argument(
+        "--direction", choices=baseline.DIRECTIONS, help="override the guess from the metric name"
+    )
+    sug.add_argument(
+        "-c", "--config", type=Path, default=Path(config.DEFAULT_CONFIG), help="config file"
+    )
+    sug.add_argument("--json", action="store_true", help="print JSON instead of YAML")
 
     ini = sub.add_parser("init", help="write a starter steadygate.yml and GitHub workflow")
     ini.add_argument("--dir", type=Path, default=Path("."), help="project folder (default: .)")
@@ -169,12 +199,77 @@ def _init(args: argparse.Namespace) -> int:
     return 0
 
 
+def _flaky(args: argparse.Namespace) -> int:
+    if not args.results and not args.history:
+        return _config_error("give one or more results files, or --history")
+    runs: list[list[Result]] = []
+    try:
+        if args.history:
+            cfg = config.load(args.config)
+            with Store(cfg.store) as store:
+                runs += store.recent_runs(cfg.window)
+        runs += [load_results(path, args.format) for path in args.results]
+    except (config.ConfigError, AdapterError) as exc:
+        return _config_error(str(exc))
+    cases = flaky.analyze(runs, args.metric)
+    if not cases:
+        return _config_error(f"no results for metric '{args.metric}'; pick one with --metric")
+    if args.json:
+        print(json.dumps({"metric": args.metric, "cases": [c.as_dict() for c in cases]}, indent=2))
+    else:
+        print(flaky.text(cases, args.metric))
+    if args.markdown:
+        args.markdown.write_text(flaky.markdown(cases, args.metric), encoding="utf-8")
+    return 0
+
+
+def _suggest(args: argparse.Namespace) -> int:
+    try:
+        cfg = config.load(args.config)
+    except config.ConfigError as exc:
+        return _config_error(str(exc))
+    with Store(cfg.store) as store:
+        metrics = args.metric or store.metrics()
+        if not metrics:
+            print("steadygate: no history yet; record some runs first", file=sys.stderr)
+            return int(Verdict.INCONCLUSIVE)
+        suggestions = [
+            baseline.suggest(
+                m,
+                store.run_aggregates(m, cfg.window),
+                args.direction or baseline.guess_direction(m),
+                cfg.min_history,
+            )
+            for m in metrics
+        ]
+    if args.json:
+        print(json.dumps([s.as_dict() for s in suggestions], indent=2))
+    else:
+        print("# Suggested rules: paste under `rules:` in steadygate.yml")
+        for s in suggestions:
+            if s.rule is None:
+                print(f"# {s.metric}: not enough history ({s.rationale})")
+                continue
+            # Plain ASCII: a Windows console can't always print the rationale's symbols.
+            print(
+                f"# {s.metric}: runs vary {s.noise or 0:.1%} around the median over "
+                f"{s.history_runs} runs; limit is 2x that, at least 5%"
+            )
+            print(yaml.safe_dump([s.rule], sort_keys=False).rstrip())
+    sized = any(s.rule is not None for s in suggestions)
+    return 0 if sized else int(Verdict.INCONCLUSIVE)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "serve":
         return _serve(args)
     if args.command == "init":
         return _init(args)
+    if args.command == "flaky":
+        return _flaky(args)
+    if args.command == "suggest":
+        return _suggest(args)
     run_id: str = args.run_id or _default_run_id()
 
     try:
