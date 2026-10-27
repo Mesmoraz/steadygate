@@ -105,7 +105,8 @@ def test_markdown_and_json_reports(project: Path, capsys: pytest.CaptureFixture[
     payload = json.loads(capsys.readouterr().out)
     assert payload["verdict"] == "regression"
     assert payload["exit_code"] == 1
-    assert payload["rules"][0]["outcome"] == "fail"
+    assert payload["rules"][0]["rule"] == "coverage"  # inferred from the baseline
+    assert payload["rules"][1]["outcome"] == "fail"
     assert payload["errors"] == [{"case": "c1", "metric": "accuracy", "message": ""}]
 
     text = md.read_text(encoding="utf-8")
@@ -151,3 +152,13 @@ def test_module_entry_point() -> None:
         sys.argv = ["steadygate", "--version"]
         runpy.run_module("steadygate", run_name="__main__")
     assert exc.value.code == 0
+
+
+def test_case_dropped_from_the_baseline_is_inconclusive(
+    project: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # No expected_cases in the config: the baseline's own cases stand in for the list.
+    seed_baseline(project)
+    res = write_results(project / "r.jsonl", [0.91])  # c1 never reported
+    assert run(project, "run", str(res)) == 2
+    assert "1/2 baseline case(s) missing: c1" in capsys.readouterr().out

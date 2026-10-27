@@ -7,15 +7,21 @@ from steadygate.rules import Absolute, Context, RelativeDelta
 
 
 class FakeHistory:
-    def __init__(self, values: list[float]) -> None:
+    def __init__(self, values: list[float], cases: list[set[str]] | None = None) -> None:
         self.values = values
+        self.cases = cases or []
         self.calls: list[tuple[str, int, str | None]] = []
+        self.case_calls: list[tuple[int, str | None]] = []
 
     def run_aggregates(
         self, metric: str, window: int, exclude_run: str | None = None
     ) -> list[float]:
         self.calls.append((metric, window, exclude_run))
         return self.values[:window]
+
+    def recent_cases(self, window: int, exclude_run: str | None = None) -> list[set[str]]:
+        self.case_calls.append((window, exclude_run))
+        return self.cases[:window]
 
 
 def ctx(history: list[float] | None = None, min_history: int = 3) -> Context:

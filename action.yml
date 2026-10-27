@@ -7,13 +7,13 @@ branding:
 
 inputs:
   results:
-    description: Results file to gate (JUnit XML, JSONL, pytest-json-report or promptfoo JSON).
+    description: Results file to gate (JUnit XML, JSONL, or pytest-json-report, promptfoo or Playwright JSON).
     required: true
   config:
     description: Path to steadygate.yml, relative to working-directory.
     default: steadygate.yml
   format:
-    description: Override format detection (jsonl, junit, pytest-json, promptfoo).
+    description: Override format detection (jsonl, junit, pytest-json, promptfoo, playwright).
     default: ""
   working-directory:
     description: Directory to run in.

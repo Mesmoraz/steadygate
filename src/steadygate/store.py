@@ -105,6 +105,23 @@ class Store:
             ).fetchall()
         return [float(v) for (v,) in rows]
 
+    def recent_cases(self, window: int, exclude_run: str | None = None) -> list[set[str]]:
+        """The cases each of the most recent ``window`` runs reported, newest first."""
+        with self._lock:
+            runs = self._conn.execute(
+                "SELECT run_id FROM runs WHERE run_id != ? ORDER BY seq DESC LIMIT ?",
+                (exclude_run or "", window),
+            ).fetchall()
+            return [
+                {
+                    case
+                    for (case,) in self._conn.execute(
+                        "SELECT DISTINCT case_id FROM results WHERE run_id = ?", (run_id,)
+                    )
+                }
+                for (run_id,) in runs
+            ]
+
     def run_count(self) -> int:
         with self._lock:
             (n,) = self._conn.execute("SELECT COUNT(*) FROM runs").fetchone()

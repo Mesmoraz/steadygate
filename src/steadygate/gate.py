@@ -9,6 +9,18 @@ from steadygate.rules import Context, History
 _MAX_MISSING_SHOWN = 10
 
 
+def _missing_outcome(missing: list[str], total: int, label: str) -> RuleOutcome:
+    shown = ", ".join(missing[:_MAX_MISSING_SHOWN])
+    more = " ..." if len(missing) > _MAX_MISSING_SHOWN else ""
+    return RuleOutcome(
+        "coverage",
+        "*",
+        True,
+        Outcome.INCONCLUSIVE,
+        f"{len(missing)}/{total} {label} case(s) missing: {shown}{more}",
+    )
+
+
 def coverage(config: Config, results: list[Result]) -> RuleOutcome | None:
     """Check every expected case reported every metric a required rule reads.
 
@@ -36,15 +48,33 @@ def coverage(config: Config, results: list[Result]) -> RuleOutcome | None:
         return RuleOutcome(
             "coverage", "*", True, Outcome.PASS, f"all {total}/{total} expected case(s) reported"
         )
-    shown = ", ".join(missing[:_MAX_MISSING_SHOWN])
-    more = " ..." if len(missing) > _MAX_MISSING_SHOWN else ""
-    return RuleOutcome(
-        "coverage",
-        "*",
-        True,
-        Outcome.INCONCLUSIVE,
-        f"{len(missing)}/{total} expected case(s) missing: {shown}{more}",
-    )
+    return _missing_outcome(missing, total, "expected")
+
+
+def baseline_coverage(results: list[Result], ctx: Context) -> RuleOutcome | None:
+    """Without ``expected_cases``, expect every case that every baseline run reported.
+
+    Only kicks in once the baseline has ``min_history`` runs. A case missing from even one
+    of them proves nothing about the candidate, so it isn't required.
+    """
+    runs = ctx.history.recent_cases(ctx.window, exclude_run=ctx.run_id)
+    if len(runs) < ctx.min_history:
+        return None
+    expected = sorted(set.intersection(*runs))
+    if not expected:
+        return None
+    cases_seen = {r.case for r in results}
+    missing = [case for case in expected if case not in cases_seen]
+    total = len(expected)
+    if not missing:
+        return RuleOutcome(
+            "coverage",
+            "*",
+            True,
+            Outcome.PASS,
+            f"all {total}/{total} case(s) from the last {len(runs)} baseline run(s) reported",
+        )
+    return _missing_outcome(missing, total, "baseline")
 
 
 def evaluate(
@@ -53,15 +83,19 @@ def evaluate(
     """Run every rule and decide.
 
     * Any **required** rule FAILs -> REGRESSION
-    * else any **required** rule is INCONCLUSIVE (including missing expected cases)
-      -> INCONCLUSIVE
+    * else any **required** rule is INCONCLUSIVE (including missing expected cases, or,
+      without ``expected_cases``, a case every baseline run reported) -> INCONCLUSIVE
     * else -> PASS
 
     Optional rules are reported but never change the verdict.
     """
     ctx = Context(history, config.window, config.min_history, run_id)
     outcomes = [rule.evaluate(results, ctx) for rule in config.rules]
-    cov = coverage(config, results)
+    cov = (
+        coverage(config, results)
+        if config.expected_cases is not None
+        else baseline_coverage(results, ctx)
+    )
     if cov is not None:
         outcomes.insert(0, cov)
     required = [o for o in outcomes if o.required]

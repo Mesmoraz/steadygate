@@ -1,0 +1,72 @@
+{
+  "config": {"version": "1.48.2", "projects": [{"id": "chromium", "name": "chromium"}, {"id": "firefox", "name": "firefox"}]},
+  "suites": [
+    {
+      "title": "checkout.spec.ts",
+      "file": "checkout.spec.ts",
+      "specs": [
+        {
+          "title": "loads the page",
+          "ok": true,
+          "tests": [
+            {"projectId": "chromium", "projectName": "chromium", "expectedStatus": "passed", "annotations": [], "status": "expected",
+             "results": [{"retry": 0, "status": "passed", "duration": 1500, "errors": []}]},
+            {"projectId": "firefox", "projectName": "firefox", "expectedStatus": "passed", "annotations": [], "status": "expected",
+             "results": [{"retry": 0, "status": "passed", "duration": 2100, "errors": []}]}
+          ]
+        }
+      ],
+      "suites": [
+        {
+          "title": "cart",
+          "file": "checkout.spec.ts",
+          "specs": [
+            {
+              "title": "applies coupon",
+              "ok": true,
+              "tests": [
+                {"projectId": "chromium", "projectName": "chromium", "expectedStatus": "passed", "annotations": [], "status": "flaky",
+                 "results": [
+                   {"retry": 0, "status": "failed", "duration": 900, "errors": [{"message": "expect(locator).toBeVisible() failed"}]},
+                   {"retry": 1, "status": "passed", "duration": 800, "errors": []}
+                 ]},
+                {"projectId": "firefox", "projectName": "firefox", "expectedStatus": "passed", "annotations": [], "status": "unexpected",
+                 "results": [{"retry": 0, "status": "timedOut", "duration": 30000, "errors": [{"message": "Test timeout of 30000ms exceeded."}]}]}
+              ]
+            },
+            {
+              "title": "known bug",
+              "ok": true,
+              "tests": [
+                {"projectId": "chromium", "projectName": "chromium", "expectedStatus": "failed", "annotations": [{"type": "fail"}], "status": "expected",
+                 "results": [{"retry": 0, "status": "failed", "duration": 400, "errors": [{"message": "boom"}]}]}
+              ]
+            },
+            {
+              "title": "pays with card",
+              "ok": false,
+              "tests": [
+                {"projectId": "chromium", "projectName": "chromium", "expectedStatus": "passed", "annotations": [], "status": "unexpected",
+                 "results": [{"retry": 0, "status": "interrupted", "duration": 120, "errors": []}]},
+                {"projectId": "firefox", "projectName": "firefox", "expectedStatus": "passed", "annotations": [], "status": "skipped",
+                 "results": []}
+              ]
+            },
+            {
+              "title": "gift wrap",
+              "ok": true,
+              "tests": [
+                {"projectId": "chromium", "projectName": "chromium", "expectedStatus": "skipped", "annotations": [{"type": "skip"}], "status": "skipped",
+                 "results": [{"retry": 0, "status": "skipped", "duration": 0, "errors": []}]},
+                {"projectId": "firefox", "projectName": "firefox", "expectedStatus": "skipped", "annotations": [{"type": "fixme"}], "status": "skipped",
+                 "results": []}
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [{"message": "Error: globalSetup: database not reachable"}],
+  "stats": {"expected": 3, "unexpected": 2, "flaky": 1, "skipped": 3}
+}

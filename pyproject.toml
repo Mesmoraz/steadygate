@@ -33,6 +33,7 @@ dev = [
   "hypothesis>=6.100",
 ]
 companion = ["fastapi>=0.110", "uvicorn>=0.29", "psutil>=5.9"]
+installer = ["pyinstaller>=6.10"]
 
 [project.scripts]
 steadygate = "steadygate.cli:main"
@@ -45,6 +46,7 @@ packages = ["src/steadygate"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "--cov=steadygate --cov-report=term-missing --cov-fail-under=90"
 
 [tool.ruff]
@@ -57,4 +59,4 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 
 [tool.mypy]
 strict = true
-files = ["src", "site"]
+files = ["src", "site", "installer"]

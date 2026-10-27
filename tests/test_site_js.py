@@ -165,3 +165,115 @@ def test_markdown_unescapes_pipes_in_list_items() -> None:
     html = render(r"- `x` [accuracy] a \| b" + "\n")
     assert "a | b" in html
     assert r"\|" not in html
+
+
+INSTALL_JS = REPO / "site" / "install.js"
+RELEASE_URL = "https://github.com/Mesmoraz/steadygate/releases/latest/download/"
+
+
+@pytest.mark.parametrize(
+    "platform,ua,expected",
+    [
+        ("Windows", "", "windows"),
+        ("", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "windows"),
+        ("macOS", "", "macos"),
+        ("", "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5)", "macos"),
+        ("Linux", "", "linux"),
+        ("", "Mozilla/5.0 (X11; Linux x86_64)", "linux"),
+        ("", "Mozilla/5.0 (Linux; Android 14)", None),
+        ("Linux", "Mozilla/5.0 (Linux; Android 14)", None),
+        ("", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", None),
+        ("", "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)", None),
+        ("", "", None),
+    ],
+)
+def test_detect_os(platform: str, ua: str, expected: str | None) -> None:
+    arg = json.dumps({"platform": platform, "userAgent": ua})
+    assert node(INSTALL_JS, f"m.detectOS({arg})") == expected
+
+
+def test_download_url() -> None:
+    assert node(INSTALL_JS, 'm.downloadUrl("macos")') == RELEASE_URL + "steadygate-setup-macos.zip"
+
+
+def test_release_api() -> None:
+    assert node(INSTALL_JS, "m.RELEASE_API") == (
+        "https://api.github.com/repos/Mesmoraz/steadygate/releases/latest"
+    )
+
+
+def _init_install_page(os_args: dict[str, str], fetch_body: str) -> Any:
+    """Run initInstall against a tiny fake document and a fake fetch; return every element."""
+    script = f"""
+const m = require({json.dumps(str(INSTALL_JS))});
+const btn = {{href: "#install", textContent: "Install now", innerHTML: "", hidden: false}};
+const note = {{hidden: false}};
+const downloads = {{hidden: false}};
+const doc = {{
+  getElementById: (id) => ({{"install-now": btn, "install-note": note}})[id] || null,
+  querySelector: (sel) => (sel === ".downloads" ? downloads : null),
+  defaultView: {{navigator: {json.dumps(os_args)}}},
+}};
+const fetchFn = {fetch_body};
+(async () => {{
+  await m.initInstall(doc, fetchFn);
+  console.log(JSON.stringify({{btn, note, downloads}}));
+}})();
+"""
+    assert NODE is not None
+    out = subprocess.run(
+        [NODE, "-e", script], capture_output=True, text=True, encoding="utf-8", check=True
+    ).stdout
+    return json.loads(out)
+
+
+def _init_install(os_args: dict[str, str], fetch_body: str) -> Any:
+    return _init_install_page(os_args, fetch_body)["btn"]
+
+
+WIN = {"platform": "Win32", "userAgent": "Mozilla/5.0 (Windows NT 10.0)"}
+
+
+def test_init_install_sets_button_for_known_os() -> None:
+    btn = _init_install(WIN, "async () => ({ok: true, status: 200})")
+    assert btn["href"] == RELEASE_URL + "steadygate-setup-windows.exe"
+    assert btn["textContent"] == "Install for Windows"
+
+
+def test_init_install_unknown_os_keeps_anchor() -> None:
+    btn = _init_install(
+        {"platform": "", "userAgent": "Android"}, "async () => ({ok: true, status: 200})"
+    )
+    assert btn["href"] == "#install"
+    assert btn["textContent"] == "Install now"
+
+
+def test_init_install_404_swaps_in_coming_soon() -> None:
+    btn = _init_install(WIN, "async () => ({ok: false, status: 404})")
+    assert "Coming soon" in btn["innerHTML"]
+    assert "pip install git+https://github.com/Mesmoraz/steadygate" in btn["innerHTML"]
+
+
+def test_init_install_404_hides_the_downloads_and_install_note() -> None:
+    page = _init_install_page(WIN, "async () => ({ok: false, status: 404})")
+    assert page["downloads"]["hidden"] is True
+    assert page["note"]["hidden"] is True
+
+
+@pytest.mark.parametrize(
+    "fetch_body",
+    [
+        "async () => ({ok: false, status: 403})",
+        "async () => ({ok: false, status: 500})",
+        "async () => { throw new Error('offline'); }",
+        "() => { throw new Error('sync'); }",
+    ],
+)
+def test_init_install_other_failures_change_nothing(fetch_body: str) -> None:
+    page = _init_install_page(WIN, fetch_body)
+    assert page["downloads"] == {"hidden": False}
+    assert page["note"] == {"hidden": False}
+    btn = page["btn"]
+    assert btn["href"] == RELEASE_URL + "steadygate-setup-windows.exe"
+    assert btn["textContent"] == "Install for Windows"
+    assert btn["innerHTML"] == ""

@@ -23,7 +23,15 @@ import yaml
 
 from steadygate.adapters import load_results
 
-SITE_FILES = ["demo.py", "knobs.js", "markdown.js", "index.html", "style.css", "app.js"]
+SITE_FILES = [
+    "demo.py",
+    "install.js",
+    "knobs.js",
+    "markdown.js",
+    "index.html",
+    "style.css",
+    "app.js",
+]
 
 SCENARIOS: dict[str, dict[str, Any]] = {
     "support": {

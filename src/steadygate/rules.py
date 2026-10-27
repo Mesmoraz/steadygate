@@ -21,6 +21,8 @@ class History(Protocol):
         self, metric: str, window: int, exclude_run: str | None = None
     ) -> list[float]: ...
 
+    def recent_cases(self, window: int, exclude_run: str | None = None) -> list[set[str]]: ...
+
 
 @dataclass(frozen=True)
 class Context:

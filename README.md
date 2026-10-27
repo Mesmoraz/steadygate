@@ -23,13 +23,52 @@ is reported as *inconclusive*, never as a silent green.
 
 > Status: pre-alpha (v0.0.1). The API and config format will change.
 
+## Who it's for
+
+- **AI and LLM app teams.** You run evals with promptfoo, DeepEval or your own script, and a
+  fixed threshold either blocks good releases or lets bad ones through. You get a go/no-go
+  that knows your normal variation.
+- **QA and release owners.** You sign off releases, and now you're asked to test AI features
+  whose outputs vary. You get one clear verdict per run, an exit code your pipeline can act
+  on, and a report in the pull request.
+- **Teams with flaky tests.** Your noisy end-to-end, performance or game tests cry wolf. You
+  get repeated-trial pass rates with confidence intervals, so 7/10 isn't treated as a
+  failure, and crashes are kept apart from real regressions.
+
+If your tests give the same answer every time, a plain pass/fail is all you need.
+
 ## Quick start
+
+Download the installer for your system:
+
+- [Windows](https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-windows.exe)
+- [Mac (Apple silicon)](https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-macos.zip).
+  On an Intel Mac, install with pip instead.
+- [Linux](https://github.com/Mesmoraz/steadygate/releases/latest/download/steadygate-setup-linux),
+  for x86_64 (64-bit Intel/AMD) (run `chmod +x steadygate-setup-linux` first)
+
+The builds are not signed yet. Windows may say "Windows protected your PC": choose
+More info, then Run anyway. Mac: Unzip it, then open the app. If macOS says it can't be
+checked, go to System Settings → Privacy & Security and choose Open Anyway.
+
+Then, in your project folder, set it up:
+
+```bash
+steadygate init
+```
+
+`steadygate init` writes a `steadygate.yml` and a GitHub workflow for you. Use `--dir` to pick
+the folder, `--format` (`promptfoo`, `pytest-json`, `playwright`, `junit` or `jsonl`), `--results`,
+`--metric`, `--tolerance` and `--eval-command` to fill in your details, and `--force` to
+overwrite files that already exist.
+
+Or install with pip:
 
 ```bash
 pip install git+https://github.com/Mesmoraz/steadygate
 ```
 
-Write a `steadygate.yml`:
+To write the config by hand, make a `steadygate.yml`:
 
 ```yaml
 store: .steadygate/history.db
@@ -153,10 +192,11 @@ Collectors for Android (over adb), web pages (a JS snippet) and iOS are next on 
 | **JUnit XML** | `.xml` | `passed` (1/0) and `duration_s` per test case; `<error>` is treated as a broken run, `<skipped>` is ignored |
 | **pytest-json-report** | `.json` with a `tests` list | `passed` and `duration_s` per test, plus every number the test stored with `json_metadata`; setup/teardown errors are a broken run |
 | **promptfoo** | `.json` with a `results` key | `passed`, `score`, `latency_ms`, `cost` and each `namedScores` metric per test (× prompt × provider); provider errors and timeouts are a broken run, not a regression |
+| **Playwright** | `.json` with a `suites` list (`--reporter=json`) | `passed`, `duration_s` and `retries` per test (× project, × `--repeat-each`); a flaky test that passed on retry counts as passed; a stopped run, tests that never started and global setup errors are a broken run |
 
-JUnit covers pytest (`--junitxml`), Jest, Playwright, Vitest, Maven and most CI tools.
+JUnit covers pytest (`--junitxml`), Jest, Vitest, Maven and most CI tools.
 A DeepEval adapter is on the roadmap. Use `--format` (`jsonl`, `junit`, `pytest-json`,
-`promptfoo`) to override detection.
+`promptfoo`, `playwright`) to override detection.
 
 ## GitHub Action
 
@@ -176,6 +216,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npx promptfoo eval --repeat 5 --output results.json   # or pytest, Jest, ...
+        continue-on-error: true    # failing evals still reach the gate
       - uses: Mesmoraz/steadygate@main
         with:
           results: results.json
@@ -190,7 +231,7 @@ nothing to host.
 |---|---|---|
 | `results` | (required) | Results file to gate |
 | `config` | `steadygate.yml` | Relative to `working-directory` |
-| `format` | detected | `jsonl`, `junit`, `pytest-json` or `promptfoo` |
+| `format` | detected | `jsonl`, `junit`, `pytest-json`, `promptfoo` or `playwright` |
 | `working-directory` | `.` | |
 | `record` | `auto` | `auto` records passing runs on default-branch pushes only; or `true` / `false` |
 | `history-cache` | `true` | Keep the history store in the Actions cache |
@@ -229,8 +270,13 @@ change the verdict.
 ### Expected cases
 
 A crashed test often writes no result at all, so it quietly drops out of the average and
-the run looks green. List the cases every run must report, and any that are missing make the
-run **INCONCLUSIVE**:
+the run looks green. Steadygate guards against this even with no setup: once the baseline has
+`min_history` runs, any case that **every** recent baseline run reported (within `window`) must
+appear again, or the run is **INCONCLUSIVE**. A case missing from even one baseline run isn't
+required, so a test you add or remove settles in on its own.
+
+To spell the list out instead, set `expected_cases`. It replaces the inferred list and works from
+the very first run:
 
 ```yaml
 expected_cases: [refund-policy, shipping-faq, escalation]   # or: expected_cases: cases.txt
@@ -238,14 +284,30 @@ expected_cases: [refund-policy, shipping-faq, escalation]   # or: expected_cases
 
 A file lists one case per line; blank lines and `#` comments are ignored. A case also
 counts as missing if it ran but dropped a metric that a required rule reads. Errored and
-skipped results count as reported, because the rules already handle them.
+skipped results count as reported, because the rules already handle them. (The inferred
+list only checks that each case reported something; it doesn't check metrics.)
+
+## Uninstall
+
+The installer puts one file on your machine and adds it to your PATH. To remove it:
+
+- **Windows:** delete `%LOCALAPPDATA%\Programs\steadygate`. Then open *Edit environment
+  variables for your account*, select `Path`, and remove that folder from the list.
+- **Mac:** delete `~/.local/bin/steadygate`. Then delete the `# added by steadygate-setup`
+  line, and the `export PATH` line under it, from `~/.zprofile` and `~/.bash_profile`.
+- **Linux:** delete `~/.local/bin/steadygate`. Then delete the `# added by steadygate-setup`
+  line, and the `export PATH` line under it, from `~/.profile`, `~/.bashrc` and `~/.zshrc`.
+
+If you installed with pip, run `pip uninstall steadygate` instead.
 
 ## Roadmap
 
 - [x] JSONL + JUnit adapters, SQLite baseline store, `absolute` + `relative_delta`, exit-code contract
 - [x] `mad_outlier` and `pass_rate` (Wilson interval over repeated trials)
 - [x] Expected-case manifest: missing cases become INCONCLUSIVE
+- [x] Without a manifest, cases every baseline run reported are expected by default
 - [x] promptfoo and pytest-json-report adapters, PR-comment GitHub Action
+- [x] Playwright JSON reporter adapter
 - [ ] DeepEval adapter
 - [x] Companion: `steadygate serve` with HTTP API, process sampling, dashboard and baseline suggestions
 - [ ] Companion collectors for Android (adb), web (JS snippet) and iOS; LAN mode with pairing
