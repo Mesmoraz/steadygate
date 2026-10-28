@@ -23,6 +23,11 @@ inputs:
       Add a passing run to the baseline history. "auto" records on pushes to the default
       branch only, so pull requests are gated against main's history without changing it.
     default: auto
+  missing-history:
+    description: >-
+      What a run that doesn't record (a pull request) reports when the baseline has no runs,
+      such as after the history cache expired. "inconclusive" or "pass".
+    default: inconclusive
   history-cache:
     description: Keep the history store between runs with the Actions cache.
     default: "true"
@@ -74,6 +79,7 @@ runs:
       env:
         CONFIG: ${{ inputs.config }}
         RECORD: ${{ inputs.record }}
+        MISSING_HISTORY: ${{ inputs.missing-history }}
         IS_DEFAULT_PUSH: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
       run: |
         # A broken config is reported by the gate step; here it only means "nothing to cache".
@@ -85,6 +91,13 @@ runs:
           *) echo "::error::record must be auto, true or false (got '$RECORD')"; exit 3 ;;
         esac
         echo "record=$record" >> "$GITHUB_OUTPUT"
+        case "$MISSING_HISTORY" in
+          inconclusive|pass) ;;
+          *) echo "::error::missing-history must be inconclusive or pass (got '$MISSING_HISTORY')"; exit 3 ;;
+        esac
+        # Runs that record build the history, so only the others need one to exist.
+        require_history=$([ "$record" != "true" ] && [ "$MISSING_HISTORY" = "inconclusive" ] && echo true || echo false)
+        echo "require-history=$require_history" >> "$GITHUB_OUTPUT"
 
     - name: Restore history
       if: inputs.history-cache == 'true' && steps.store.outputs.path != ''
@@ -103,12 +116,14 @@ runs:
         CONFIG: ${{ inputs.config }}
         FORMAT: ${{ inputs.format }}
         RECORD: ${{ steps.store.outputs.record }}
+        REQUIRE_HISTORY: ${{ steps.store.outputs.require-history }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       run: |
         report="$RUNNER_TEMP/steadygate-report-$GITHUB_RUN_ID-$RANDOM.md"
         args=(run "$RESULTS" --config "$CONFIG" --markdown "$report")
         [ -n "$FORMAT" ] && args+=(--format "$FORMAT")
         [ "$RECORD" = "true" ] && args+=(--record)
+        [ "$REQUIRE_HISTORY" = "true" ] && args+=(--require-history)
         set +e
         steadygate "${args[@]}"
         code=$?

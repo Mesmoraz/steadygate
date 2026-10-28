@@ -169,3 +169,62 @@ def test_manifest_wins_over_inference() -> None:
     result = gate.evaluate(cfg(["a"]), full("a"), history)
     assert result.verdict is Verdict.PASS
     assert history.case_calls == []
+
+
+# --- require_history: an empty history is not a pass ------------------------------------
+
+
+def test_require_history_with_no_runs_is_inconclusive() -> None:
+    result = gate.evaluate(cfg(), full("a"), FakeHistory([]), require_history=True)
+    assert result.verdict is Verdict.INCONCLUSIVE
+    hist = result.outcomes[0]
+    assert hist.rule == "history" and hist.required and hist.outcome is Outcome.INCONCLUSIVE
+    assert "no baseline runs" in hist.detail
+
+
+def test_require_history_is_satisfied_by_any_run() -> None:
+    result = gate.evaluate(cfg(), full("a"), FakeHistory([], [{"a"}]), require_history=True)
+    assert result.verdict is Verdict.PASS
+    assert "history" not in [o.rule for o in result.outcomes]
+
+
+def test_empty_history_passes_by_default() -> None:
+    assert gate.evaluate(cfg(), full("a"), FakeHistory([])).verdict is Verdict.PASS
+
+
+def test_require_history_skips_gates_that_stand_on_their_own() -> None:
+    # A case list and history-free rules (absolute here) can judge a run with no baseline.
+    result = gate.evaluate(cfg(["a"]), full("a"), FakeHistory([]), require_history=True)
+    assert result.verdict is Verdict.PASS
+    assert "history" not in [o.rule for o in result.outcomes]
+
+
+def test_require_history_applies_when_a_required_rule_needs_a_baseline() -> None:
+    c = config.parse(
+        {
+            "expected_cases": ["a"],
+            "rules": [{"type": "relative_delta", "metric": "acc", "max_regression": 0.05}],
+        }
+    )
+    result = gate.evaluate(c, full("a"), FakeHistory([]), require_history=True)
+    assert result.verdict is Verdict.INCONCLUSIVE
+    assert result.outcomes[0].rule == "history"
+
+
+def test_require_history_ignores_optional_rules_without_a_baseline() -> None:
+    c = config.parse(
+        {
+            "expected_cases": ["a"],
+            "rules": [
+                {"type": "absolute", "metric": "acc", "min": 0.5},
+                {
+                    "type": "relative_delta",
+                    "metric": "latency",
+                    "max_regression": 0.25,
+                    "required": False,
+                },
+            ],
+        }
+    )
+    result = gate.evaluate(c, full("a"), FakeHistory([]), require_history=True)
+    assert result.verdict is Verdict.PASS
