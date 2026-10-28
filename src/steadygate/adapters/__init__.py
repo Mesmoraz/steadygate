@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from steadygate.adapters import jsonl, junit, playwright, promptfoo, pytest_json
+from steadygate.adapters import deepeval, jsonl, junit, playwright, promptfoo, pytest_json
 from steadygate.models import Result
 
 ADAPTERS = {
+    "deepeval": deepeval.load,
     "jsonl": jsonl.load,
     "junit": junit.load,
     "playwright": playwright.load,
@@ -22,7 +23,7 @@ class AdapterError(ValueError):
 
 
 def _sniff_json(path: Path) -> str:
-    """Tell pytest-json-report, promptfoo and Playwright output apart by their top-level keys."""
+    """Tell the JSON formats apart by their top-level keys."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
@@ -34,6 +35,8 @@ def _sniff_json(path: Path) -> str:
             return "promptfoo"
         if isinstance(data.get("suites"), list):
             return "playwright"
+        if deepeval.is_deepeval(data):
+            return "deepeval"
     raise AdapterError(
         f"can't tell which tool wrote {path.name}; pass --format ({', '.join(ADAPTERS)})"
     )

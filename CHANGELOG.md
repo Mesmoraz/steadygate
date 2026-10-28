@@ -20,8 +20,8 @@ The first release on PyPI.
   `pass_rate` (Wilson score interval over repeated trials). Each can be required or optional.
 - Missing cases are INCONCLUSIVE, never a silent pass: from an `expected_cases` list, or
   inferred from every case the recent baseline runs always reported.
-- Adapters for JSONL, JUnit XML, pytest-json-report, promptfoo and the Playwright JSON
-  reporter. Crashes, timeouts and provider errors are kept apart from real failures.
+- Adapters for JSONL, JUnit XML, pytest-json-report, promptfoo, DeepEval and the Playwright
+  JSON reporter. Crashes, timeouts and provider errors are kept apart from real failures.
 - `steadygate flaky`: per-case pass rate with a confidence interval, flip rate, and a list
   of quarantine candidates, across one or more results files or the recorded history.
 - `steadygate suggest`: `relative_delta` rules sized from your own run-to-run noise.
