@@ -1,0 +1,42 @@
+name: Wrong verdict
+description: Steadygate said PASS, REGRESSION or INCONCLUSIVE and it should have said something else.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `steadygate --version`
+    validations:
+      required: true
+  - type: dropdown
+    id: verdict
+    attributes:
+      label: What Steadygate said
+      options: [PASS, REGRESSION, INCONCLUSIVE, config error]
+    validations:
+      required: true
+  - type: dropdown
+    id: expected
+    attributes:
+      label: What it should have said
+      options: [PASS, REGRESSION, INCONCLUSIVE, config error]
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: steadygate.yml
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output of `steadygate run ... --json`
+      render: json
+  - type: textarea
+    id: details
+    attributes:
+      label: Anything else
+      description: The results format and tool that produced it. Attach a trimmed results file if you can.

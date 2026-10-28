@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "steadygate"
-version = "0.0.1"
+version = "0.1.0"
 description = "A statistical release gate for non-deterministic systems: LLM agents, evals, and flaky test suites."
 readme = "README.md"
 license = "MIT"
@@ -14,9 +14,14 @@ requires-python = ">=3.11"
 dependencies = ["PyYAML>=6.0"]
 keywords = ["ci", "evals", "llm", "testing", "quality-gate", "regression", "flaky-tests"]
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
+  "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Environment :: Console",
+  "Operating System :: OS Independent",
   "Topic :: Software Development :: Quality Assurance",
   "Topic :: Software Development :: Testing",
 ]
@@ -39,7 +44,14 @@ installer = ["pyinstaller>=6.10"]
 steadygate = "steadygate.cli:main"
 
 [project.urls]
+Homepage = "https://mesmoraz.github.io/steadygate/"
 Repository = "https://github.com/Mesmoraz/steadygate"
+Issues = "https://github.com/Mesmoraz/steadygate/issues"
+Changelog = "https://github.com/Mesmoraz/steadygate/blob/main/CHANGELOG.md"
+
+# Only what a source build needs, so local scratch files never ship in the sdist.
+[tool.hatch.build.targets.sdist]
+include = ["/src/steadygate", "/tests", "/examples", "/README.md", "/LICENSE", "/CHANGELOG.md"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/steadygate"]

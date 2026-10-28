@@ -194,6 +194,7 @@ def test_json_detection_sniffs_contents(tmp_path: Path, fixtures: Path) -> None:
     assert detect_format(fixtures / "pytest-report.json") == "pytest-json"
     assert detect_format(fixtures / "promptfoo.json") == "promptfoo"
     assert detect_format(fixtures / "playwright.json") == "playwright"
+    assert detect_format(fixtures / "deepeval.json") == "deepeval"
     for body, message in (("[]", "which tool"), ("{nope", "as JSON")):
         p = tmp_path / "x.json"
         p.write_text(body, encoding="utf-8")
@@ -266,3 +267,67 @@ def test_playwright_needs_suites_list(tmp_path: Path) -> None:
     p.write_text('{"config": {}}', encoding="utf-8")
     with pytest.raises(AdapterError, match="'suites' list"):
         load_results(p, "playwright")
+
+
+def test_deepeval_maps_cases_metrics_and_errors(fixtures: Path) -> None:
+    results = load_results(fixtures / "deepeval.json")
+    by = {(r.case, r.metric): r for r in results}
+
+    assert by["refund_policy", "passed"].value == 1.0
+    assert by["refund_policy", "Answer Relevancy"].value == 0.92
+    assert by["refund_policy", "Faithfulness"].value == 1.0
+    assert by["refund_policy", "latency_ms"].value == 1250.0
+    assert by["refund_policy", "cost"].value == 0.0021
+    assert by["shipping_eta", "passed"].value == 0.0  # below threshold: a real failure
+    assert by["shipping_eta", "passed"].status is Status.OK
+    assert by["shipping_eta", "Answer Relevancy"].value == 0.41
+    assert ("shipping_eta", "latency_ms") not in by
+
+    # A judge timeout breaks the run: INCONCLUSIVE, not a regression.
+    assert by["escalation", "Faithfulness"].status is Status.ERROR
+    assert by["escalation", "Faithfulness"].message == "Request timed out after 60s"
+    assert by["escalation", "passed"].status is Status.ERROR
+    assert by["escalation", "passed"].message == "Faithfulness: Request timed out after 60s"
+    assert by["escalation", "Answer Relevancy"].value == 0.95
+
+    assert by["password_reset_chat", "passed"].value == 1.0
+    assert by["password_reset_chat", "Conversation Completeness"].value == 0.8
+
+
+def test_deepeval_repeated_names_are_trials_and_gaps_are_tolerated(tmp_path: Path) -> None:
+    p = tmp_path / "run.json"
+    case: dict[str, Any] = {
+        "name": "t",
+        "success": True,
+        "metricsData": [{"name": "G", "score": 1}],
+    }
+    p.write_text(
+        json.dumps(
+            {
+                "testCases": [
+                    case,
+                    {**case, "success": False},
+                    {"order": 7, "metricsData": [{"name": "G", "score": None}, "junk"]},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    results = load_results(p, "deepeval")
+    assert [(r.case, r.metric, r.value) for r in results] == [
+        ("t", "G", 1.0),
+        ("t", "passed", 1.0),
+        ("t", "G", 1.0),
+        ("t", "passed", 0.0),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("body", "message"),
+    [('{"testCases": {}}', "'testCases' list"), ('{"testCases": [1]}', "must be an object")],
+)
+def test_deepeval_rejects_malformed_runs(tmp_path: Path, body: str, message: str) -> None:
+    p = tmp_path / "run.json"
+    p.write_text(body, encoding="utf-8")
+    with pytest.raises(AdapterError, match=message):
+        load_results(p, "deepeval")

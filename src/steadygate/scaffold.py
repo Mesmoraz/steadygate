@@ -8,14 +8,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, get_args
 
-Format = Literal["promptfoo", "pytest-json", "playwright", "junit", "jsonl"]
+Format = Literal["promptfoo", "deepeval", "pytest-json", "playwright", "junit", "jsonl"]
 FORMATS: tuple[Format, ...] = get_args(Format)
 
 ACTION_REF = "v1"
 CONFIG_PATH = Path("steadygate.yml")
 WORKFLOW_PATH = Path(".github/workflows/steadygate.yml")
 
-_PASS_RATE_FORMATS = ("pytest-json", "playwright", "junit")
+_PASS_RATE_FORMATS = ("deepeval", "pytest-json", "playwright", "junit")
 _PLAIN_YAML = re.compile(r"[A-Za-z0-9_./-]+")
 
 
@@ -44,6 +44,15 @@ def default_answers(format: Format) -> Answers:
             "score",
             0.05,
             "npx promptfoo eval --repeat 5 --output results.json",
+        )
+    if format == "deepeval":
+        # DeepEval always rewrites this snapshot of the latest run, at a fixed path.
+        return Answers(
+            format,
+            ".deepeval/.latest_run_full.json",
+            "passed",
+            0.05,
+            "deepeval test run test_evals.py",
         )
     if format == "pytest-json":
         return Answers(format, "report.json", "passed")

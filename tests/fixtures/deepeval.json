@@ -1,0 +1,67 @@
+{
+  "testFile": "test_support_agent.py",
+  "testCases": [
+    {
+      "name": "refund_policy",
+      "input": "Can I get a refund after 40 days?",
+      "actualOutput": "Refunds are available within 30 days of purchase.",
+      "retrievalContext": ["Refunds: within 30 days of purchase."],
+      "completionTime": 1.25,
+      "tokenCost": 0.0021,
+      "flaky": false,
+      "success": true,
+      "metricsData": [
+        {"name": "Answer Relevancy", "threshold": 0.7, "success": true, "score": 0.92, "reason": "On topic.", "strictMode": false, "flaky": false, "evaluationModel": "gpt-4.1", "evaluationCost": 0.0004},
+        {"name": "Faithfulness", "threshold": 0.7, "success": true, "score": 1.0, "strictMode": false, "flaky": false, "evaluationModel": "gpt-4.1", "evaluationCost": 0.0005}
+      ],
+      "runDuration": 3.1,
+      "evaluationCost": 0.0009,
+      "order": 0
+    },
+    {
+      "name": "shipping_eta",
+      "input": "When will my order arrive?",
+      "actualOutput": "Orders ship the same day.",
+      "flaky": false,
+      "success": false,
+      "metricsData": [
+        {"name": "Answer Relevancy", "threshold": 0.7, "success": false, "score": 0.41, "reason": "Answers a different question.", "strictMode": false, "flaky": false, "evaluationModel": "gpt-4.1"},
+        {"name": "Faithfulness", "threshold": 0.7, "success": true, "score": 0.88, "strictMode": false, "flaky": false, "evaluationModel": "gpt-4.1"}
+      ],
+      "runDuration": 2.7,
+      "order": 1
+    },
+    {
+      "name": "escalation",
+      "input": "I want to speak to a human.",
+      "actualOutput": "Connecting you now.",
+      "flaky": false,
+      "success": false,
+      "metricsData": [
+        {"name": "Answer Relevancy", "threshold": 0.7, "success": true, "score": 0.95, "strictMode": false, "flaky": false, "evaluationModel": "gpt-4.1"},
+        {"name": "Faithfulness", "threshold": 0.7, "success": false, "strictMode": false, "flaky": false, "evaluationModel": "gpt-4.1", "error": "Request timed out after 60s"}
+      ],
+      "runDuration": 61.0,
+      "order": 2
+    }
+  ],
+  "conversationalTestCases": [
+    {
+      "name": "password_reset_chat",
+      "success": true,
+      "metricsData": [
+        {"name": "Conversation Completeness", "threshold": 0.5, "success": true, "score": 0.8, "strictMode": false, "flaky": false}
+      ],
+      "runDuration": 4.2,
+      "turns": [{"role": "user", "content": "I forgot my password", "order": 0}],
+      "flaky": false,
+      "order": 3
+    }
+  ],
+  "metricsScores": [],
+  "testPassed": 2,
+  "testFailed": 2,
+  "runDuration": 70.9,
+  "evaluationCost": 0.0009,
+  "official": false
+}

@@ -1,0 +1,15 @@
+name: Feature or new format
+description: Ask for a new input format, rule or integration.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to gate?
+      description: Your tool, what its results look like, and where the current gate falls short.
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: A small sample of the output (for a new format)

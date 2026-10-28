@@ -21,7 +21,7 @@ against your own history and gives one of three answers:
 The core rule is that **errors can never make you pass.** A crashed test or a judge timeout
 is reported as *inconclusive*, never as a silent green.
 
-> Status: pre-alpha (v0.0.1). The API and config format will change.
+> Status: alpha (v0.1.0). The config format may still change before 1.0; the exit codes won't.
 
 ## Who it's for
 
@@ -58,14 +58,14 @@ steadygate init
 ```
 
 `steadygate init` writes a `steadygate.yml` and a GitHub workflow for you. Use `--dir` to pick
-the folder, `--format` (`promptfoo`, `pytest-json`, `playwright`, `junit` or `jsonl`), `--results`,
+the folder, `--format` (`promptfoo`, `deepeval`, `pytest-json`, `playwright`, `junit` or `jsonl`), `--results`,
 `--metric`, `--tolerance` and `--eval-command` to fill in your details, and `--force` to
 overwrite files that already exist.
 
-Or install with pip:
+Or install from PyPI (Python 3.11 or newer):
 
 ```bash
-pip install git+https://github.com/Mesmoraz/steadygate
+pipx install steadygate        # or: pip install steadygate
 ```
 
 To write the config by hand, make a `steadygate.yml`:
@@ -118,6 +118,47 @@ steadygate run candidate-broken.jsonl       # REGRESSION: 3/10 is confidently be
 
 Or try these scenarios in the [live demo](https://mesmoraz.github.io/steadygate/), where you can move the scores yourself.
 
+## Find flaky cases
+
+`steadygate flaky` reads one or more results files (oldest first) and scores every case on
+its pass/fail trials. Repeated runs inside one file count too, such as Playwright's
+`--repeat-each` or an eval run 5 times.
+
+```bash
+steadygate flaky nightly-1.xml nightly-2.xml nightly-3.xml
+steadygate flaky --history                 # the runs recorded in the baseline store
+steadygate flaky results.json --markdown flaky.md --json
+```
+
+```text
+steadygate flaky: 2 flaky, 1 passing (metric: passed)
+  case          status  passed  pass rate      flips
+  cancel-order  flaky   10/20   50% (30%-70%)  3 (16%)
+  book-flight   flaky   18/20   90% (70%-97%)  3 (16%)
+
+Quarantine candidates:
+  - cancel-order
+  - book-flight
+```
+
+The pass rate comes with a 95% Wilson interval, so you can tell "sometimes fails" from
+"usually fails". Errored trials (crashes, timeouts) are counted apart and never make a case
+look flaky. Use `--metric` for a pass/fail metric not named `passed`; a trial passes at a
+value of 0.5 or more.
+
+## Let your history pick the thresholds
+
+Once a few runs are recorded, `steadygate suggest` sizes a `relative_delta` rule for each
+metric from how much it really moves between runs (twice the MAD/median noise, at least 5%):
+
+```bash
+steadygate suggest                  # every metric in the history
+steadygate suggest --metric accuracy --json
+```
+
+It prints YAML to paste under `rules:`. The direction is guessed from the name (`latency_ms`,
+`cost` and `duration_s` are lower-is-better); override it with `--direction`.
+
 ## Companion: run it next to your app
 
 `steadygate serve` starts a small local service with an HTTP API that any language can call,
@@ -133,7 +174,7 @@ steadygate serve                      # http://127.0.0.1:7777  (API docs at /doc
 
 Open the dashboard, pick a process, press **Start**, watch the charts, then **Stop**, **Record as
 baseline**, **Suggest baseline** and **Run gate**. To do the same from a script, see
-[`examples/companion/walkthrough.sh`](examples/companion/walkthrough.sh), which runs the whole
+[`examples/companion/walkthrough.sh`](https://github.com/Mesmoraz/steadygate/blob/main/examples/companion/walkthrough.sh), which runs the whole
 flow with curl.
 
 ### API
@@ -193,10 +234,11 @@ Collectors for Android (over adb), web pages (a JS snippet) and iOS are next on 
 | **pytest-json-report** | `.json` with a `tests` list | `passed` and `duration_s` per test, plus every number the test stored with `json_metadata`; setup/teardown errors are a broken run |
 | **promptfoo** | `.json` with a `results` key | `passed`, `score`, `latency_ms`, `cost` and each `namedScores` metric per test (× prompt × provider); provider errors and timeouts are a broken run, not a regression |
 | **Playwright** | `.json` with a `suites` list (`--reporter=json`) | `passed`, `duration_s` and `retries` per test (× project, × `--repeat-each`); a flaky test that passed on retry counts as passed; a stopped run, tests that never started and global setup errors are a broken run |
+| **DeepEval** | `.json` with a `testCases` list: `.deepeval/.latest_run_full.json`, or `test_run_*.json` in `DEEPEVAL_RESULTS_FOLDER` | `passed` per test case, a score for each metric under its own name (`Answer Relevancy`, `Faithfulness`, ...), `latency_ms` and `cost`; a metric that errored (judge timeout, API error) is a broken run, not a regression |
 
 JUnit covers pytest (`--junitxml`), Jest, Vitest, Maven and most CI tools.
-A DeepEval adapter is on the roadmap. Use `--format` (`jsonl`, `junit`, `pytest-json`,
-`promptfoo`, `playwright`) to override detection.
+Use `--format` (`jsonl`, `junit`, `pytest-json`, `promptfoo`, `playwright`, `deepeval`) to
+override detection.
 
 ## GitHub Action
 
@@ -239,14 +281,14 @@ rules, is never held up.
 |---|---|---|
 | `results` | (required) | Results file to gate |
 | `config` | `steadygate.yml` | Relative to `working-directory` |
-| `format` | detected | `jsonl`, `junit`, `pytest-json`, `promptfoo` or `playwright` |
+| `format` | detected | `jsonl`, `junit`, `pytest-json`, `promptfoo`, `playwright` or `deepeval` |
 | `working-directory` | `.` | |
 | `record` | `auto` | `auto` records passing runs on default-branch pushes only; or `true` / `false` |
 | `missing-history` | `inconclusive` | What a run that doesn't record reports when there is no history: `inconclusive` or `pass` |
 | `history-cache` | `true` | Keep the history store in the Actions cache |
 | `cache-key` | `steadygate-history` | Use a different one for each gate in a repository |
 | `comment` | `true` | Post the report on pull requests |
-| `package` | this action's copy | A pip requirement, to pin a released version |
+| `package` | this action's copy | A pip requirement, to pin a released version (e.g. `steadygate==0.1.0`) |
 
 Outputs are `verdict` (`pass`, `regression`, `inconclusive`, `config-error`), `exit-code` and
 `report` (path to the markdown). The step fails on any non-zero code; add
@@ -317,10 +359,10 @@ If you installed with pip, run `pip uninstall steadygate` instead.
 - [x] Without a manifest, cases every baseline run reported are expected by default
 - [x] promptfoo and pytest-json-report adapters, PR-comment GitHub Action
 - [x] Playwright JSON reporter adapter
-- [ ] DeepEval adapter
+- [x] DeepEval adapter
 - [x] Companion: `steadygate serve` with HTTP API, process sampling, dashboard and baseline suggestions
 - [ ] Companion collectors for Android (adb), web (JS snippet) and iOS; LAN mode with pairing
-- [ ] `steadygate flaky`
+- [x] `steadygate flaky` and `steadygate suggest`
 
 ## Development
 
@@ -338,6 +380,13 @@ python -m build --wheel --outdir dist && python site/build.py --out _site --whee
 
 Local-first: Steadygate makes no network calls and collects no telemetry. The companion
 dashboard ships its own copy of Chart.js (MIT), so it works offline.
+
+## Contributing
+
+Bug reports are welcome, especially a verdict you think is wrong. See
+[CONTRIBUTING.md](https://github.com/Mesmoraz/steadygate/blob/main/CONTRIBUTING.md) for setup and
+the ground rules, and [CHANGELOG.md](https://github.com/Mesmoraz/steadygate/blob/main/CHANGELOG.md)
+for what changed in each release.
 
 ## License
 
